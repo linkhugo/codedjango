@@ -1,0 +1,17 @@
+{% extends "admin/index.html" %}
+{% load static %}
+
+{% block extrahead %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'css/custom.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <a href="{% url 'admin_guide' %}" target="_blank" class="admin-guide-btn">
+        📖 Guía de Administración
+    </a>
+    <span class="admin-guide-hint">Documentación completa de configuración del panel admin</span>
+</div>
+{{ block.super }}
+{% endblock %}
