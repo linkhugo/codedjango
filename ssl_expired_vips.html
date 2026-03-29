@@ -1,0 +1,220 @@
+{% extends 'base.html' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'ssl_cert_list' %}">SSL</a></li>
+<li class="breadcrumb-item active">VIPs Cert Vencido / Por Vencer</li>
+{% endblock %}
+
+{% block page_help %}
+<p class="text-muted small mb-3">
+    <i class="fa-solid fa-triangle-exclamation text-warning me-1"></i>
+    Esta página muestra los <strong>servicios de red (VIPs) que tienen un problema con su certificado de seguridad</strong> — ya sea que el certificado venció o está a punto de vencer.
+</p>
+<hr class="my-3">
+<p class="fw-semibold mb-2"><i class="fa-solid fa-circle-info text-primary me-1"></i>¿Por qué esto es importante?</p>
+<p class="small text-muted">Cuando un certificado vence, los usuarios que intenten entrar al sitio web verán un <strong>mensaje de "Sitio no seguro"</strong> en su navegador y es posible que no puedan acceder al servicio.</p>
+<hr class="my-3">
+<p class="fw-semibold mb-2"><i class="fa-solid fa-palette text-primary me-1"></i>¿Qué significan los colores?</p>
+<ul class="small text-muted ps-3">
+    <li class="mb-2"><span class="badge bg-danger">Rojo</span> — El certificado <strong>ya venció</strong>. Atención inmediata requerida.</li>
+    <li class="mb-2"><span class="badge bg-warning text-dark">Amarillo</span> — El certificado <strong>vence en menos de 30 días</strong>. Hay que renovarlo pronto.</li>
+</ul>
+<hr class="my-3">
+<p class="fw-semibold mb-2"><i class="fa-solid fa-arrow-right text-primary me-1"></i>¿Qué debo hacer?</p>
+<p class="small text-muted mb-0">Comparte esta lista con el área de infraestructura o seguridad para que renueven los certificados indicados. Mientras más rápido, mejor.</p>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">
+            <i class="fa-solid fa-triangle-exclamation text-danger me-2"></i>VIPs — Certificados Vencidos / Por Vencer
+        </h1>
+        <p class="text-muted">
+            {% if expired_count %}
+                <span class="badge bg-danger me-1">{{ expired_count }} vencido(s)</span>
+            {% endif %}
+            {% if soon_count %}
+                <span class="badge bg-warning text-dark me-1">{{ soon_count }} vence en &le;30 días</span>
+            {% endif %}
+            {% if not total %}
+                <span class="text-success"><i class="fa-solid fa-circle-check me-1"></i>Sin certificados críticos</span>
+            {% endif %}
+        </p>
+    </div>
+    {% if results %}
+    <div id="exportButtons"></div>
+    {% endif %}
+</div>
+
+{% if results %}
+
+    <!-- Hidden flat table for export -->
+    <table id="exportTable" class="d-none">
+        <thead>
+            <tr>
+                <th>Estado</th>
+                <th>LTM FQDN</th>
+                <th>VIP Name</th>
+                <th>Destination</th>
+                <th>Port</th>
+                <th>VIP Enabled</th>
+                <th>SSL Profile</th>
+                <th>Certificate</th>
+                <th>Expiration Date</th>
+                <th>Días (+ vencido / - restante)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in results %}
+            <tr>
+                <td>{% if r.status == 'expired' %}Vencido{% else %}Por vencer{% endif %}</td>
+                <td>{{ r.ltm_fqdn }}</td>
+                <td>{{ r.vip_name }}</td>
+                <td>{{ r.vip_destination }}</td>
+                <td>{{ r.vip_destination_port|default:"-" }}</td>
+                <td>{{ r.vip_enabled }}</td>
+                <td>{{ r.ssl_profile_name }}</td>
+                <td>{{ r.cert_name }}</td>
+                <td>{{ r.cert_expiration }}</td>
+                <td>{{ r.days_diff }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Cards -->
+    {% for r in results %}
+    <div class="card card-modern mb-3
+        {% if r.status == 'expired' %}border-danger border-opacity-75
+        {% else %}border-warning border-opacity-75{% endif %}">
+
+        <div class="card-header-modern
+            {% if r.status == 'expired' %}bg-danger bg-opacity-10
+            {% else %}bg-warning bg-opacity-10{% endif %}">
+            <h5 class="card-title-modern d-flex align-items-center gap-2 flex-wrap">
+                {% if r.status == 'expired' %}
+                    <i class="fa-solid fa-circle-xmark text-danger"></i>
+                {% else %}
+                    <i class="fa-solid fa-clock text-warning"></i>
+                {% endif %}
+                <strong>{{ r.vip_name }}</strong>
+                <span class="text-muted small fw-normal">— {{ r.ltm_fqdn }}</span>
+                {% if r.vip_enabled == 'yes' or r.vip_enabled == 'enabled' %}
+                    <span class="badge bg-success ms-1">Enabled</span>
+                {% elif r.vip_enabled and r.vip_enabled != '-' %}
+                    <span class="badge bg-secondary ms-1">{{ r.vip_enabled }}</span>
+                {% endif %}
+                {% if r.status == 'expired' %}
+                    <span class="badge bg-danger ms-1">
+                        <i class="fa-solid fa-calendar-xmark me-1"></i>Vencido hace {{ r.days_abs }} día(s)
+                    </span>
+                {% else %}
+                    <span class="badge bg-warning text-dark ms-1">
+                        <i class="fa-solid fa-hourglass-half me-1"></i>Vence en {{ r.days_abs }} día(s)
+                    </span>
+                {% endif %}
+            </h5>
+        </div>
+
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <span class="small text-muted d-block">Destination</span>
+                    <code>{{ r.vip_destination }}{% if r.vip_destination_port %}:{{ r.vip_destination_port }}{% endif %}</code>
+                </div>
+                <div class="col-md-4">
+                    <span class="small text-muted d-block">SSL Profile</span>
+                    <code class="small">{{ r.ssl_profile_name }}</code>
+                </div>
+                <div class="col-md-5">
+                    <span class="small text-muted d-block">Certificado</span>
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <code class="small {% if r.status == 'expired' %}text-danger{% else %}text-warning{% endif %}">
+                            {{ r.cert_name }}
+                        </code>
+                        {% if r.cert_expiration and r.cert_expiration != '-' %}
+                            <span class="badge {% if r.status == 'expired' %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+                                <i class="fa-solid fa-calendar me-1"></i>{{ r.cert_expiration }}
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+{% else %}
+    <div class="card card-modern">
+        <div class="card-body text-center py-5 text-muted">
+            <i class="fa-solid fa-circle-check fa-2x mb-3 d-block text-success"></i>
+            No hay VIPs con certificados vencidos o próximos a vencer (30 días)
+        </div>
+    </div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if results %}
+<script nonce="{{ csp_nonce }}">
+$(document).ready(function() {
+    var now = new Date();
+    var pad = function(n) { return n < 10 ? '0' + n : n; };
+    var dateStr = now.getFullYear() + '' + pad(now.getMonth()+1) + '' + pad(now.getDate()) +
+                  '_' + pad(now.getHours()) + '' + pad(now.getMinutes());
+    var filename = 'vips_cert_vencido_' + dateStr;
+
+    function tableToCSV(tableId) {
+        var rows = document.querySelectorAll('#' + tableId + ' tr');
+        var csv = [];
+        rows.forEach(function(row) {
+            var cells = row.querySelectorAll('th, td');
+            var rowData = Array.from(cells).map(function(cell) {
+                return '"' + cell.textContent.trim().replace(/"/g, '""') + '"';
+            });
+            csv.push(rowData.join(','));
+        });
+        return '\uFEFF' + csv.join('\r\n');
+    }
+
+    function downloadFile(content, filename, mimeType) {
+        var blob = new Blob([content], { type: mimeType });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click();
+        document.body.removeChild(a); URL.revokeObjectURL(url);
+    }
+
+    function downloadExcel(tableId, filename) {
+        var table = document.getElementById(tableId);
+        var html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" ' +
+                   'xmlns:x="urn:schemas-microsoft-com:office:excel" ' +
+                   'xmlns="http://www.w3.org/TR/REC-html40">' +
+                   '<head><meta charset="UTF-8"><!--[if gte mso 9]><xml>' +
+                   '<x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>' +
+                   '<x:Name>VIPs Cert Vencido</x:Name>' +
+                   '<x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>' +
+                   '</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook>' +
+                   '</xml><![endif]--></head><body>' + table.outerHTML + '</body></html>';
+        downloadFile(html, filename + '.xls', 'application/vnd.ms-excel;charset=utf-8');
+    }
+
+    var $btns = $('#exportButtons');
+    $btns.append(
+        $('<button class="btn btn-outline-secondary btn-sm me-1">' +
+          '<i class="fa-solid fa-file-csv me-1"></i> CSV</button>')
+        .on('click', function() {
+            downloadFile(tableToCSV('exportTable'), filename + '.csv', 'text/csv;charset=utf-8');
+        })
+    );
+    $btns.append(
+        $('<button class="btn btn-outline-success btn-sm">' +
+          '<i class="fa-solid fa-file-excel me-1"></i> Excel</button>')
+        .on('click', function() { downloadExcel('exportTable', filename); })
+    );
+});
+</script>
+{% endif %}
+{% endblock %}
