@@ -1,0 +1,309 @@
+{% extends 'base.html' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item active">Servicios</li>
+{% endblock %}
+
+{% block page_help %}
+<p class="text-muted small mb-3">
+    <i class="fa-solid fa-network-wired text-primary me-1"></i>
+    <strong>Servicios</strong> — Lista de configuraciones que vinculan un nombre de servicio con uno o más equipos balanceadores donde está desplegado.
+</p>
+<hr class="my-3">
+<p class="fw-semibold mb-2"><i class="fa-solid fa-table text-primary me-1"></i>¿Qué información veo aquí?</p>
+<ul class="small text-muted ps-3">
+    <li class="mb-1"><span class="badge bg-secondary">Nombre del servicio</span> Nombre que identifica el servicio (por ejemplo: un sistema de negocio o aplicación).</li>
+    <li class="mb-1"><span class="badge bg-secondary">LTM FQDN</span> Nombre del equipo balanceador donde está publicado este servicio.</li>
+    <li class="mb-1"><span class="badge bg-secondary">Enabled</span> Si el servicio está habilitado y activo en el balanceador.</li>
+</ul>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">
+            <i class="fa-solid fa-network-wired text-primary me-2"></i>Servicios
+        </h1>
+        <p class="text-muted">Total: <strong id="totalCount">{{ total }}</strong> records</p>
+    </div>
+    <div>
+        <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#syncModal">
+            <i class="fa-solid fa-rotate me-1"></i>Sync VIPs
+        </button>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card card-modern mb-3">
+    <div class="card-body py-2 d-flex align-items-center gap-3 flex-wrap">
+        <label class="fw-semibold mb-0 text-nowrap">
+            <i class="fa-solid fa-filter me-1 text-muted"></i>Filters:
+        </label>
+        <select id="ltmFilter" class="form-select form-select-sm" style="max-width:280px;">
+            <option value="">— All LTMs —</option>
+            {% for fqdn in ltm_fqdns %}
+            <option value="{{ fqdn }}">{{ fqdn }}</option>
+            {% endfor %}
+        </select>
+        <select id="servicioFilter" class="form-select form-select-sm" style="max-width:280px;">
+            <option value="">— All Servicios —</option>
+            {% for svc in servicios %}
+            <option value="{{ svc }}">{{ svc }}</option>
+            {% endfor %}
+        </select>
+        <button id="clearFilters" class="btn btn-sm btn-outline-secondary">
+            <i class="fa-solid fa-xmark me-1"></i>Clear
+        </button>
+    </div>
+</div>
+
+<div class="card card-modern">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table id="dataTable" class="table table-hover datatable mb-0">
+                <thead>
+                    <tr>
+                        <th>ID</th>             <!-- 0 -->
+                        <th>Name</th>           <!-- 1 -->
+                        <th>Enabled</th>        <!-- 2 -->
+                        <th>Servicio</th>       <!-- 3 -->
+                        <th>LTM FQN</th>        <!-- 4 -->
+                        <th>Last Modified</th>  <!-- 5 -->
+                        <th>Comments</th>       <!-- 6 -->
+                        <th>Availability</th>   <!-- 7 -->
+                        <th></th>               <!-- 8 edit btn -->
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ── Edit modal ─────────────────────────────────────────────────── -->
+<div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fa-solid fa-pen-to-square me-2 text-primary"></i>Edit Servicio
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editId">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Name <span class="text-muted small fw-normal">(from VIP, read-only)</span></label>
+                    <input type="text" id="editName" class="form-control form-control-sm bg-light" readonly>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Servicio</label>
+                    <input type="text" id="editServicio" class="form-control form-control-sm" maxlength="100">
+                </div>
+                <div class="mb-0">
+                    <label class="form-label fw-semibold">Comments</label>
+                    <input type="text" id="editComentarios" class="form-control form-control-sm" maxlength="200">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary btn-sm" id="editSaveBtn">
+                    <i class="fa-solid fa-floppy-disk me-1"></i>Save
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Sync confirmation modal ────────────────────────────────────── -->
+<div class="modal fade" id="syncModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fa-solid fa-rotate me-2 text-primary"></i>Sync VIPs → Servicios
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>This will sync VIPs into <strong>Servicios</strong>:</p>
+                <ul class="text-muted small mb-0">
+                    <li><strong>Insert</strong> — new VIPs not yet in Servicios.</li>
+                    <li><strong>Update</strong> — <code>enabled</code> when it changed in VIPs.</li>
+                    <li>Fields edited manually (<em>servicio, comentarios, description</em>) are never overwritten.</li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary btn-sm" id="syncBtn">
+                    <i class="fa-solid fa-rotate me-1"></i>Run Sync
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Toast ──────────────────────────────────────────────────────── -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index:1100">
+    <div id="syncToast" class="toast align-items-center border-0" role="alert">
+        <div class="d-flex">
+            <div class="toast-body" id="syncToastMsg"></div>
+            <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ csp_nonce }}">
+$(document).ready(function () {
+    const AVAIL_MAP = {
+        'available':   '<span class="badge bg-success">available</span>',
+        'offline':     '<span class="badge bg-danger">offline</span>',
+        'unknown':     '<span class="badge bg-secondary">unknown</span>',
+        'unavailable': '<span class="badge bg-warning text-dark">unavailable</span>',
+    };
+
+    const ENABLED_MAP = {
+        'true':     '<span class="badge bg-success">Enabled</span>',
+        'yes':      '<span class="badge bg-success">Enabled</span>',
+        'enabled':  '<span class="badge bg-success">Enabled</span>',
+        '1':        '<span class="badge bg-success">Enabled</span>',
+        'false':    '<span class="badge bg-danger">Disabled</span>',
+        'no':       '<span class="badge bg-danger">Disabled</span>',
+        'disabled': '<span class="badge bg-danger">Disabled</span>',
+        '0':        '<span class="badge bg-danger">Disabled</span>',
+    };
+
+    function t(v, w) {
+        if (!v || v === '-') return '-';
+        return `<span class="text-truncate d-inline-block" style="max-width:${w||160}px" title="${v}">${v}</span>`;
+    }
+
+    var table = initDataTable('#dataTable', {
+        serverSide: true,
+        processing: true,
+        ajax: {
+            url: '{% url "servicio_data" %}',
+            type: 'GET',
+            data: function (d) {
+                d.ltm_fqdn          = $('#ltmFilter').val();
+                d.servicio_filter   = $('#servicioFilter').val();
+            },
+        },
+        columns: [
+            { data: 0 },  // 0 id
+            { data: 1 },  // 1 name
+            { data: 2, render: v => ENABLED_MAP[String(v).toLowerCase()] ?? `<span class="badge bg-secondary">${v}</span>` },
+            { data: 3 },  // 3 servicio
+            { data: 4, render: v => t(v, 200) },  // 4 ltm_fqn
+            { data: 5 },  // 5 last modified
+            { data: 6, render: v => t(v, 200) },  // 6 comentarios
+            { data: 7, render: v => AVAIL_MAP[String(v).toLowerCase()] ?? `<span class="badge bg-secondary">${v}</span>` },  // 7 availability
+            {           // 8 edit button
+                data: null,
+                orderable: false,
+                searchable: false,
+                className: 'text-center',
+                render: (_, __, row) =>
+                    `<button class="btn btn-sm btn-outline-secondary py-0 px-2 edit-btn"
+                             data-id="${row[0]}"
+                             data-name="${row[1]}"
+                             data-servicio="${row[3]}"
+                             data-comentarios="${row[6]}">
+                        <i class="fa-solid fa-pen-to-square"></i>
+                     </button>`,
+            },
+        ],
+        columnDefs: [
+            { targets: [0], visible: false },
+        ],
+        dom: 'Blfrtip',
+        buttons: [
+            { extend: 'colvis', text: '<i class="fa-solid fa-eye me-1"></i>Columns', className: 'btn btn-sm btn-outline-secondary' },
+            { extend: 'excel',  text: '<i class="fa-solid fa-file-excel me-1"></i>Excel', className: 'btn btn-sm btn-outline-success', exportOptions: { columns: ':visible' } },
+            { extend: 'csv',    text: '<i class="fa-solid fa-file-csv me-1"></i>CSV',   className: 'btn btn-sm btn-outline-secondary', exportOptions: { columns: ':visible' } },
+        ],
+        order: [[1, 'asc']],
+        pageLength: 50,
+    });
+
+    // ── Filters ──────────────────────────────────────────────────────
+    $('#ltmFilter, #servicioFilter').on('change', function () {
+        table.ajax.reload();
+    });
+    $('#clearFilters').on('click', function () {
+        $('#ltmFilter, #servicioFilter').val('');
+        table.ajax.reload();
+    });
+
+    // ── Open edit modal ──────────────────────────────────────────────
+    $('#dataTable').on('click', '.edit-btn', function () {
+        const b = $(this);
+        $('#editId').val(b.data('id'));
+        $('#editName').val(b.data('name'));
+        $('#editServicio').val(b.data('servicio') === '-' ? '' : b.data('servicio'));
+        $('#editComentarios').val(b.data('comentarios') === '-' ? '' : b.data('comentarios'));
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('editModal')).show();
+    });
+
+    // ── Save edit ────────────────────────────────────────────────────
+    $('#editSaveBtn').on('click', function () {
+        const btn = $(this).prop('disabled', true);
+        const id  = $('#editId').val();
+
+        $.ajax({
+            url: `/services/${id}/edit/`,
+            type: 'POST',
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+            data: {
+                servicio:    $('#editServicio').val(),
+                comentarios: $('#editComentarios').val(),
+            },
+            success: function () {
+                bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
+                table.ajax.reload(null, false);
+            },
+            error: function () { alert('Save failed. Check the server logs.'); },
+            complete: function () { btn.prop('disabled', false); },
+        });
+    });
+
+    // ── Sync ─────────────────────────────────────────────────────────
+    $('#syncBtn').on('click', function () {
+        const btn = $(this).prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>Syncing…');
+
+        $.ajax({
+            url: '{% url "servicio_sync" %}',
+            type: 'POST',
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+            success: function (data) {
+                bootstrap.Modal.getInstance(document.getElementById('syncModal')).hide();
+                table.ajax.reload(null, false);
+
+                const changed = data.inserted > 0 || data.updated > 0;
+                let parts = [];
+                if (data.inserted > 0) parts.push(`<strong>${data.inserted}</strong> inserted`);
+                if (data.updated  > 0) parts.push(`<strong>${data.updated}</strong> enabled updated`);
+                const msg = changed
+                    ? `<i class="fa-solid fa-check-circle me-1"></i>${parts.join(' · ')}.`
+                    : `<i class="fa-solid fa-info-circle me-1"></i>Nothing to sync — Servicios is already up to date.`;
+
+                const toast = document.getElementById('syncToast');
+                toast.classList.toggle('text-bg-success', changed);
+                toast.classList.toggle('text-bg-info',   !changed);
+                document.getElementById('syncToastMsg').innerHTML = msg;
+                bootstrap.Toast.getOrCreateInstance(toast, { delay: 4000 }).show();
+
+                if (data.inserted > 0) {
+                    const cur = parseInt($('#totalCount').text()) || 0;
+                    $('#totalCount').text(cur + data.inserted);
+                }
+            },
+            error: function () { alert('Sync failed. Check the server logs.'); },
+            complete: function () { btn.prop('disabled', false).html('<i class="fa-solid fa-rotate me-1"></i>Run Sync'); },
+        });
+    });
+});
+</script>
+{% endblock %}
