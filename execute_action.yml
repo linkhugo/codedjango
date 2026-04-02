@@ -1,0 +1,101 @@
+---
+
+- name: "Inicializar valor_raw para el check {{ item.code }}"
+  ansible.builtin.set_fact:
+    valor_raw: "ERROR_INIT"
+
+- name: "Consultar iControlREST API para el check {{ item.code }}"
+  ansible.builtin.uri:
+    url: "https://{{ ansible_host }}:{{ f5_api_port }}{{ item.api_path }}"
+    method: GET
+    headers:
+      X-F5-Auth-Token: "{{ f5_api_token }}"
+      Content-Type: "application/json"
+    validate_certs: "{{ f5_validate_certs }}"
+    status_code: 200
+    timeout: 30
+  register: api_result
+  delegate_to: localhost
+  no_log: true
+  ignore_errors: true
+
+- name: "Marcar valor ERROR si la llamada API fallo para {{ item.code }}"
+  ansible.builtin.set_fact:
+    valor_raw: "ERROR_{{ api_result.status | default('CONN') }}"
+  when: api_result.failed or api_result.status | default(0) != 200
+
+- name: "Extraer y normalizar campo '{{ item.campo }}' de la respuesta JSON"
+  ansible.builtin.set_fact:
+    valor_raw: >-
+      {%- set parts = [] -%}
+      {%- set _campo = item.campo -%}
+      {%- set _wrap = api_result.json | dict2items | selectattr('key','equalto','items') | list -%}
+      {%- set objs = _wrap[0].value if _wrap | length > 0 else [api_result.json] -%}
+      {%- for obj in objs -%}
+        {%- if _campo in obj -%}
+          {%- set raw = obj[_campo] -%}
+          {%- if raw is sequence and raw is not string -%}
+            {%- set _ = parts.append(raw | join(' ') | lower) -%}
+          {%- else -%}
+            {%- set _ = parts.append(raw | string | lower) -%}
+          {%- endif -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {{ parts | join(' ') }}
+  when: not (api_result.failed or api_result.status | default(0) != 200)
+
+- name: "Filtrar valor_raw a la linea de display_keyword para {{ item.code }}"
+  ansible.builtin.set_fact:
+    valor_raw: >-
+      {%- set _kw = item.display_keyword -%}
+      {%- set _match = valor_raw | regex_search('(?i)' + _kw + r'\s+(.*)', '\1') -%}
+      {{ _match[0] | trim if _match else 'missing:' + _kw }}
+  when:
+    - item.display_keyword is defined
+    - not (api_result.failed or api_result.status | default(0) != 200)
+
+- name: "Construir lista de tokens desde la salida normalizada"
+  ansible.builtin.set_fact:
+    valor_lista: >-
+      {{
+        valor_raw
+        | replace(',', ' ')
+        | regex_replace('\\s+', ' ')
+        | split(' ')
+        | reject('equalto', '')
+        | list
+      }}
+
+- name: "Extraer entradas NTP desde la salida"
+  ansible.builtin.set_fact:
+    ntp_entries: >-
+      {{
+        valor_raw
+        | regex_findall('[A-Za-z0-9.-]+')
+        | reject('match','^servers$')
+        | reject('match','^ntp$')
+        | reject('match','^include$')
+        | list
+      }}
+  when: item.policy | default([]) | selectattr('type','equalto','min_entry_count') | list | length > 0
+
+- name: "Establecer valor_obtenido"
+  ansible.builtin.set_fact:
+    valor_obtenido: "{{ valor_raw }}"
+
+- name: "Evaluar politica para el check {{ item.code }}"
+  ansible.builtin.include_tasks: policy_engine.yml
+  when: item.policy is defined
+
+- name: "Agregar resultado del check {{ item.code }} al acumulador"
+  ansible.builtin.set_fact:
+    resultados: "{{ resultados + [{
+      'Device': inventory_hostname,
+      'Code': item.code,
+      'Descripcion': item.descripcion,
+      'Valor_Obtenido': valor_obtenido,
+      'Valor_Recomendado': item.valor_recomendado | default('NA'),
+      'Resultado': resultado,
+      'Comando_Para_Validar': item.cmd,
+      'fecha': fecha_actual
+      }]}}"
