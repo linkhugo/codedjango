@@ -1,0 +1,152 @@
+{% extends 'base.html' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item active">Documentación</li>
+{% endblock %}
+
+{% block page_help %}
+<p class="text-muted small mb-3">
+    <i class="fa-solid fa-file-lines text-primary me-1"></i>
+    <strong>Documentación</strong> — Catálogo de documentos y recursos con enlace directo a su ubicación.
+</p>
+<hr class="my-3">
+<p class="fw-semibold mb-2"><i class="fa-solid fa-table text-primary me-1"></i>¿Qué información veo aquí?</p>
+<ul class="small text-muted ps-3">
+    <li class="mb-1"><span class="badge bg-secondary">Categoría</span> Tipo o área al que pertenece el documento.</li>
+    <li class="mb-1"><span class="badge bg-secondary">Nombre</span> Título del documento o recurso.</li>
+    <li class="mb-1"><span class="badge bg-secondary">Descripción</span> Breve descripción del contenido.</li>
+    <li class="mb-1"><span class="badge bg-secondary">Enlace</span> Acceso directo al documento.</li>
+</ul>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">
+            <i class="fa-solid fa-file-lines text-primary me-2"></i>Documentación
+        </h1>
+        <p class="text-muted">Total: <strong>{{ objects|length }}</strong> documento(s)</p>
+    </div>
+    {% if perms.lb_manager.add_docentry %}
+    <a href="{% url 'doc_entry_add' %}" class="btn btn-primary">
+        <i class="fa-solid fa-plus me-1"></i> Agregar Documento
+    </a>
+    {% endif %}
+</div>
+
+<!-- Filtro por categoría -->
+<div class="card card-modern mb-3">
+    <div class="card-body py-3">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label mb-1 small fw-semibold">Categoría</label>
+                <select id="categoryFilter" class="form-select form-select-sm">
+                    <option value="">— Todas las categorías —</option>
+                    {% for cat in categories %}
+                    {% if cat %}
+                    <option value="{{ cat }}">{{ cat }}</option>
+                    {% endif %}
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button id="btnClearFilters" class="btn btn-outline-secondary btn-sm w-100">
+                    <i class="fa-solid fa-xmark me-1"></i>Limpiar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card card-modern">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table id="dataTable" class="table table-hover datatable mb-0">
+                <thead>
+                    <tr>
+                        <th>Categoría</th>
+                        <th>Nombre</th>
+                        <th>Descripción</th>
+                        <th class="text-center">Enlace</th>
+                        {% if perms.lb_manager.change_docentry or perms.lb_manager.delete_docentry %}
+                        <th class="text-center">Acciones</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for obj in objects %}
+                    <tr>
+                        <td>
+                            {% if obj.category %}
+                            <span class="badge bg-primary">{{ obj.category }}</span>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td><strong>{{ obj.name }}</strong></td>
+                        <td class="text-muted small">{{ obj.description|default:"—" }}</td>
+                        <td class="text-center">
+                            <a href="{{ obj.url }}" target="_blank" rel="noopener noreferrer"
+                               class="btn btn-sm btn-outline-primary" title="{{ obj.url }}">
+                                <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                            </a>
+                        </td>
+                        {% if perms.lb_manager.change_docentry or perms.lb_manager.delete_docentry %}
+                        <td class="text-center">
+                            {% if perms.lb_manager.change_docentry %}
+                            <a href="{% url 'doc_entry_edit' obj.pk %}"
+                               class="btn btn-sm btn-outline-primary me-1" title="Editar">
+                                <i class="fa-solid fa-pen"></i>
+                            </a>
+                            {% endif %}
+                            {% if perms.lb_manager.delete_docentry %}
+                            <a href="{% url 'doc_entry_delete' obj.pk %}"
+                               class="btn btn-sm btn-outline-danger" title="Eliminar">
+                                <i class="fa-solid fa-trash"></i>
+                            </a>
+                            {% endif %}
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ csp_nonce }}">
+$(document).ready(function () {
+    const table = initDataTable('#dataTable', {
+        order: [[0, 'asc'], [1, 'asc']],
+        pageLength: 25,
+        dom: 'Blfrtip',
+        buttons: [
+            {
+                extend: 'excel',
+                text: '<i class="fa-solid fa-file-excel me-1"></i>Excel',
+                className: 'btn btn-sm btn-outline-success',
+                exportOptions: { columns: ':visible:not(:last-child)' },
+            },
+            {
+                extend: 'csv',
+                text: '<i class="fa-solid fa-file-csv me-1"></i>CSV',
+                className: 'btn btn-sm btn-outline-secondary',
+                exportOptions: { columns: ':visible:not(:last-child)' },
+            },
+        ],
+    });
+
+    $('#categoryFilter').on('change', function () {
+        table.column(0).search($(this).val()).draw();
+    });
+
+    $('#btnClearFilters').on('click', function () {
+        $('#categoryFilter').val('');
+        table.column(0).search('').draw();
+    });
+});
+</script>
+{% endblock %}
