@@ -1,0 +1,171 @@
+---
+- name: Healthcheck F5
+  gather_facts: false
+  hosts: "{{ Device }}"
+  vars:
+    failsafe: OK
+    Backup: false
+    # ── CSV output ───────────────────────────────────
+    _healthcheck_output_dirs:
+      MX: "/reportes/mx"
+      US: "/reportes/us"
+    healthcheck_output_dir: "{{ _healthcheck_output_dirs[country | default('')] | default('/pruebas') }}"
+    healthcheck_output_csv: "{{ healthcheck_output_dir }}/healthcheck_f5_{{ '%Y-%m-%d' | strftime }}.csv"
+    # ── F5 iControlREST ──────────────────────────────
+    f5_api_port: 443
+    f5_validate_certs: false
+    f5_token_timeout: 3600
+    f5_auth_provider: "tmos"
+    lb_user: "{{ ansible_user }}"
+    lb_pass: "{{ ansible_password }}"
+    # ── API REST Django ───────────────────────────────
+    lb_api_push: false
+    lb_api_url: ""
+    lb_api_user: "{{ api_user | default('') }}"
+    lb_api_pass: "{{ api_password | default('') }}"
+
+  tasks:
+
+    - name: "Obtener token JWT de la API Django (una vez para todos los hosts)"
+      ansible.builtin.uri:
+        url: "{{ lb_api_url }}/api/v1/token/"
+        method: POST
+        body_format: json
+        body:
+          username: "{{ lb_api_user }}"
+          password: "{{ lb_api_pass }}"
+        status_code: 200
+        timeout: 30
+      register: _lb_api_jwt_result
+      delegate_to: localhost
+      run_once: true
+      no_log: true
+      when: lb_api_push | default(false)
+
+    - name: "Compartir token JWT con todos los hosts"
+      ansible.builtin.set_fact:
+        _lb_api_token: "{{ hostvars[ansible_play_hosts[0]]._lb_api_jwt_result.json.access }}"
+      when: lb_api_push | default(false)
+
+    - name: Inicializar valores por defecto
+      ansible.builtin.set_fact:
+        host_ok: false
+
+    - name: Validar Conexion
+      ansible.builtin.ping:
+      register: ping_result
+      ignore_unreachable: yes
+      ignore_errors: yes
+
+    - name: Mostrar host como alcanzable
+      ansible.builtin.set_fact:
+        host_ok: true
+      when: ping_result is defined and ping_result.ping is defined
+
+    - name: Bloque principal con cleanup de token
+      block:
+
+        - name: Tareas si es alcanzable el LB
+          block:
+
+            - name: Obtener token iControlREST
+              ansible.builtin.include_tasks: tasks/f5_get_token.yml
+
+            - name: Obtener información del dispositivo
+              ansible.builtin.include_tasks: tasks/f5_get_device_info.yml
+
+            - name: Validar status failover
+              ansible.builtin.include_tasks: tasks/f5_get_failover_status.yml
+
+            - name: Validar logs de eventos Failover
+              shell: tmsh show sys log ltm range now-1d  | grep -E -i 'Active for traffic group | Standby for traffic group'
+              register: failsafe_events
+              ignore_errors: yes
+
+            - name: Validar salida failsafe_events
+              set_fact:
+                failsafe: "WARNING"
+              when: failsafe_events.stdout_lines | length > 0
+
+            - name: Validar el status de la sincronia
+              ansible.builtin.include_tasks: tasks/f5_get_sync_status.yml
+
+            - name: Validar el numero de lineas del archivo /var/log/ltm
+              shell: tmsh show /sys log ltm range now-1d | grep -i 'daemon' | wc -l
+              register: logs_ltm
+
+            - name: Validar la utilizacion de cpu de las ultimas 24 hrs de Data Plane
+              shell: "tmsh show sys performance system detail | grep 'Data Plane' | awk '{print $4}'"
+              register: cpu_data_use
+              ignore_errors: yes
+
+            - name: Validar la utilizacion de cpu de las ultimas 24 hrs de Control Plane
+              shell: "tmsh show sys performance system detail | grep 'Control Plane' | awk '{print $4}'"
+              register: cpu_plane_use
+              ignore_errors: yes
+
+            - name: Validar la utilizacion de cpu de las ultimas 24 hrs de Analysis Plane
+              shell: "tmsh show sys performance system detail | grep 'Analysis Plane' | awk '{print $4}'"
+              register: cpu_analysis_use
+              ignore_errors: yes
+
+            - name: Validar top de conexiones en 24 hrs
+              ansible.builtin.include_tasks: tasks/f5_get_connections_top.yml
+
+            - name: Validar memoria TMM
+              ansible.builtin.include_tasks: tasks/f5_get_memory_tmm.yml
+
+            - name: Validar total de nodos y nodos UP
+              ansible.builtin.include_tasks: tasks/f5_get_node_count.yml
+
+            - name: Validar estado de Virtual Servers
+              ansible.builtin.include_tasks: tasks/f5_get_virtual_servers.yml
+
+            - name: Obtener backup_path
+              ansible.builtin.set_fact:
+                backup_path: "{{ hostvars[inventory_hostname]['backup_path'] | default('') }}"
+
+            - name: Buscar la ultima carpeta Creada
+              remote_user: Pruebas
+              become: yes
+              shell: ls -1 -t "{{ hostvars[inventory_hostname]['backup_path'] }}{{ inventory_hostname }}/" | head -n1
+              register: ultima_carpeta
+              delegate_to: dnsmx02.wt.mx.corp
+              ignore_errors: yes
+
+            - name: Validar que los se encuentren en su carpeta
+              remote_user: Pruebas
+              become: yes
+              find:
+                paths: "{{ hostvars[inventory_hostname]['backup_path'] | default('') }}{{ inventory_hostname }}/{{ ultima_carpeta.stdout | default('') }}"
+                patterns: "*"
+              register: archivos_encontrados
+              delegate_to: serverbackup
+              ignore_errors: yes
+
+            - name: Validar si encuentra mas de 1 archivo en los Backup
+              set_fact:
+                Backup: True
+              when: archivos_encontrados.matched | default(0) | int >= 1
+
+            - name: Generar registro en CSV
+              ansible.builtin.include_tasks: tasks/f5_generate_csv.yml
+
+            - name: Enviar datos via API REST
+              ansible.builtin.include_tasks: tasks/f5_post_api_rest.yml
+              when: lb_api_push | default(false)
+
+          when: host_ok
+
+        - name: Generar registro en CSV cuando el equipo es unreachable
+          ansible.builtin.include_tasks: tasks/f5_generate_csv_unreachable.yml
+          when: not host_ok
+
+        - name: Enviar datos unreachable via API REST
+          ansible.builtin.include_tasks: tasks/f5_post_api_rest_unreachable.yml
+          when: not host_ok and lb_api_push | default(false)
+
+      always:
+
+        - name: Revocar token iControlREST
+          ansible.builtin.include_tasks: tasks/f5_revoke_token.yml
