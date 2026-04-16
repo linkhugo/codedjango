@@ -1,0 +1,44 @@
+---
+# Consulta el estado de sincronía de CM (Configuration Management) via iControlREST.
+# Equivalente a: tmsh show cm sync-status | grep ^Status | awk '{print $2" "$3}'
+#
+# Requiere:
+#   - f5_api_token      : token activo (obtenido por f5_get_token.yml)
+#   - ansible_host      : IP o FQDN del BIG-IP
+#   - f5_api_port       : puerto HTTPS (default 443)
+#   - f5_validate_certs : validación TLS (default false)
+#
+# Publica:
+#   - sync : ej. "In Sync" | "Standalone" | "Changes Pending" |
+#                "Awaiting Initial Sync" | "Disconnected" | "unknown"
+
+- name: "Consultar estado de sincronía de {{ inventory_hostname }}"
+  ansible.builtin.uri:
+    url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/cm/sync-status"
+    method: GET
+    headers:
+      X-F5-Auth-Token: "{{ f5_api_token }}"
+    validate_certs: "{{ f5_validate_certs }}"
+    status_code: 200
+    timeout: 30
+  delegate_to: localhost
+  register: _sync_raw
+
+- name: "Extraer lista de entries de sincronía"
+  ansible.builtin.set_fact:
+    _sync_list: >-
+      {{
+        _sync_raw.json.entries | default({}) | dict2items
+        | map(attribute='value') | list
+      }}
+
+- name: "Publicar estado de sincronía"
+  ansible.builtin.set_fact:
+    sync: >-
+      {{ (_sync_list | first) | json_query('nestedStats.entries.status.description') | default('unknown') }}
+  when: _sync_list | length > 0
+
+- name: "Publicar estado de sincronía (sin datos)"
+  ansible.builtin.set_fact:
+    sync: "unknown"
+  when: _sync_list | length == 0

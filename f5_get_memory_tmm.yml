@@ -1,0 +1,64 @@
+---
+# Consulta la memoria TMM (Total y Used) via iControlREST.
+# Equivalente a: tmsh show sys memory | grep 'TMM' -A 2
+#
+# Una sola llamada API extrae ambos valores.
+#
+# Requiere:
+#   - f5_api_token      : token activo (obtenido por f5_get_token.yml)
+#   - ansible_host      : IP o FQDN del BIG-IP
+#   - f5_api_port       : puerto HTTPS (default 443)
+#   - f5_validate_certs : validación TLS (default false)
+#
+# Publica:
+#   - mem_tmm_total : memoria total TMM en MB (float, 0 si no hay datos)
+#   - mem_tmm_used  : memoria usada TMM en MB (float, 0 si no hay datos)
+
+- name: "Consultar memoria del sistema de {{ inventory_hostname }}"
+  ansible.builtin.uri:
+    url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/sys/memory"
+    method: GET
+    headers:
+      X-F5-Auth-Token: "{{ f5_api_token }}"
+    validate_certs: "{{ f5_validate_certs }}"
+    status_code: 200
+    timeout: 30
+  delegate_to: localhost
+  register: _memory_raw
+
+- name: "Extraer lista memory-host"
+  ansible.builtin.set_fact:
+    _mem_host_list: >-
+      {{
+        _memory_raw.json.entries | default({}) | dict2items
+        | selectattr('key', 'search', 'memory-host$')
+        | map(attribute='value') | list
+      }}
+
+- name: "Extraer lista memory-host/0"
+  ansible.builtin.set_fact:
+    _mem_host_0_list: >-
+      {{
+        (_mem_host_list | first).nestedStats.entries | default({}) | dict2items
+        | selectattr('key', 'search', '/0$')
+        | map(attribute='value') | list
+      }}
+  when: _mem_host_list | length > 0
+
+- name: "Publicar memoria TMM"
+  ansible.builtin.set_fact:
+    mem_tmm_total: >-
+      {{ ((_mem_host_0_list | first).nestedStats.entries.memoryTotal.value | int / 1048576) | round(2) }}
+    mem_tmm_used: >-
+      {{ ((_mem_host_0_list | first).nestedStats.entries.memoryUsed.value | int / 1048576) | round(2) }}
+  when:
+    - _mem_host_list | length > 0
+    - _mem_host_0_list | default([]) | length > 0
+
+- name: "Publicar memoria TMM (sin datos)"
+  ansible.builtin.set_fact:
+    mem_tmm_total: 0
+    mem_tmm_used: 0
+  when: >-
+    _mem_host_list | length == 0
+    or _mem_host_0_list | default([]) | length == 0

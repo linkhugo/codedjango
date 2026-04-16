@@ -1,0 +1,36 @@
+---
+# Genera un registro CSV con todos los datos del healthcheck del host.
+# Modo append: cada host agrega una fila al mismo archivo.
+# El header se crea automáticamente si el archivo no existe.
+#
+# Requiere:
+#   - healthcheck_output_csv : path completo del archivo CSV
+#                              ej: -e healthcheck_output_csv=/reportes/healthcheck_f5.csv
+
+- name: "Crear directorio del CSV si no existe"
+  ansible.builtin.file:
+    path: "{{ healthcheck_output_dir }}"
+    state: directory
+    mode: '0755'
+  delegate_to: localhost
+
+- name: "Verificar si el CSV ya existe"
+  ansible.builtin.stat:
+    path: "{{ healthcheck_output_csv }}"
+  register: _csv_stat
+  delegate_to: localhost
+
+- name: "Insertar header en el CSV"
+  ansible.builtin.lineinfile:
+    path: "{{ healthcheck_output_csv }}"
+    line: "fqdn,uptime,failover,failsafe,sync,ltm_logs,cpu_usage,cpu_plane_use,cpu_analysis_use,top_connections,tmm_memory,tmm_memory_used,nodes,nodes_up,nodes_down,nodes_user_down,vips,vips_up,vips_offline,vips_unknown,fecha,company,last_folder,file_backup,backup_path"
+    create: true
+  delegate_to: localhost
+  when: not _csv_stat.stat.exists
+
+- name: "Agregar fila de {{ inventory_hostname }} al CSV"
+  ansible.builtin.lineinfile:
+    path: "{{ healthcheck_output_csv }}"
+    line: "{{ inventory_hostname }},{{ dias | default(0) | int }},{{ failover | default('') }},{{ failsafe | default('') }},{{ sync | default('') }},{{ logs_ltm.stdout | default(0) | int }},{{ cpu_data_use.stdout | default('') | int(0) }},{{ cpu_plane_use.stdout | default('') | int(0) }},{{ cpu_analysis_use.stdout | default('') | int(0) }},{{ con_top | default(0) | int }},{{ mem_tmm_total | default(0) }},{{ mem_tmm_used | default(0) }},{{ nodes | default(0) | int }},{{ nodes_up | default(0) | int }},{{ nodes_down | default(0) | int }},{{ nodes_user_down | default(0) | int }},{{ vip | default(0) | int }},{{ vip_available | default(0) | int }},{{ vip_offline | default(0) | int }},{{ vip_unknown | default(0) | int }},{{ lookup('pipe', 'TZ=America/Mexico_City date +%Y-%m-%d') }},{{ company | default('') }},{{ ultima_carpeta.stdout | default('') }},{{ Backup | default(false) | string }},{{ backup_path | default('') }}"
+    create: true
+  delegate_to: localhost

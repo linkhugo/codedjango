@@ -1,0 +1,43 @@
+---
+# Consulta el top de conexiones históricas via iControlREST.
+# Equivalente a: tmsh show sys performance system historical | grep ^Connections | awk '{print $4}'
+#
+# Requiere:
+#   - f5_api_token      : token activo (obtenido por f5_get_token.yml)
+#   - ansible_host      : IP o FQDN del BIG-IP
+#   - f5_api_port       : puerto HTTPS (default 443)
+#   - f5_validate_certs : validación TLS (default false)
+#
+# Publica:
+#   - con_top : valor promedio de conexiones concurrentes (entero, 0 si no hay datos)
+
+- name: "Consultar top de conexiones históricas de {{ inventory_hostname }}"
+  ansible.builtin.uri:
+    url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/sys/performance/connections"
+    method: GET
+    headers:
+      X-F5-Auth-Token: "{{ f5_api_token }}"
+    validate_certs: "{{ f5_validate_certs }}"
+    status_code: 200
+    timeout: 30
+  delegate_to: localhost
+  register: _conn_raw
+
+- name: "Extraer lista de stats de conexiones"
+  ansible.builtin.set_fact:
+    _conn_list: >-
+      {{
+        _conn_raw.json.entries | default({}) | dict2items
+        | selectattr('key', 'search', '/Connections$')
+        | map(attribute='value') | list
+      }}
+
+- name: "Publicar top de conexiones"
+  ansible.builtin.set_fact:
+    con_top: "{{ (_conn_list | first).nestedStats.entries.Average.description | default(0) | int }}"
+  when: _conn_list | length > 0
+
+- name: "Publicar top de conexiones (sin datos)"
+  ansible.builtin.set_fact:
+    con_top: 0
+  when: _conn_list | length == 0
