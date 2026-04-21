@@ -1,0 +1,169 @@
+{% extends 'base.html' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item active">Guest LBs</li>
+{% endblock %}
+
+{% block page_help %}
+<p class="text-muted small mb-3">
+    <i class="fa-solid fa-cloud text-primary me-1"></i>
+    <strong>Balanceadores Virtuales (Guest)</strong> — Inventario de instancias virtuales de balanceadores de carga. Son balanceadores que funcionan como máquinas virtuales, no como hardware dedicado.
+</p>
+<hr class="my-3">
+<p class="fw-semibold mb-2"><i class="fa-solid fa-table text-primary me-1"></i>¿Qué información veo aquí?</p>
+<ul class="small text-muted ps-3">
+    <li class="mb-1"><span class="badge bg-secondary">Device</span> Nombre de la instancia virtual del balanceador.</li>
+    <li class="mb-1"><span class="badge bg-secondary">Mgmt IP</span> Dirección IP de administración de la instancia virtual.</li>
+    <li class="mb-1"><span class="badge bg-secondary">Model / Version</span> Modelo y versión del software del balanceador virtual.</li>
+    <li class="mb-1"><span class="badge bg-secondary">Environment</span> Ambiente al que pertenece: producción, desarrollo, pruebas, etc.</li>
+    <li class="mb-1"><span class="badge bg-secondary">Company</span> Empresa o cliente al que está asignada esta instancia.</li>
+</ul>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">
+            <i class="fa-solid fa-cloud text-primary me-2"></i>Guest Load Balancers
+        </h1>
+        <p class="text-muted">Total: <strong>{{ objects|length }}</strong> records</p>
+    </div>
+    <a href="{% url 'lb_guest_add' %}" class="btn btn-primary">
+        <i class="fa-solid fa-plus me-1"></i> Add Guest LB
+    </a>
+</div>
+
+<div class="card card-modern">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table id="dataTable" class="table table-hover datatable mb-0">
+                <thead>
+                    <tr>
+                        <th>Device</th>
+                        <th>Mgmt IP</th>
+                        <th>Version</th>
+                        <th>Model</th>
+                        <th>Serial</th>
+                        <th>Environment</th>
+                        <th>Company</th>
+                        <th>Monitoreo</th>
+                        <th>CMDB-SNMP</th>
+                        <th>CyberArk</th>
+                        <th>URL CyberArk</th>
+                        <th>Last Modified</th>
+                        <th class="text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for obj in objects %}
+                    <tr>
+                        <td><strong>{{ obj.device }}</strong></td>
+                        <td><code>{{ obj.mgmt_ip|default:"-" }}</code></td>
+                        <td>{{ obj.version|default:"-" }}</td>
+                        <td>{{ obj.model|default:"-" }}</td>
+                        <td>{{ obj.serial|default:"-" }}</td>
+                        <td>
+                            {% if obj.environment %}
+                                <span class="badge bg-secondary">{{ obj.environment }}</span>
+                            {% else %}-{% endif %}
+                        </td>
+                        <td>{{ obj.company|default:"-" }}</td>
+                        <td class="text-center">{% include 'lb_manager/_boolean_icon.html' with value=obj.monitoreo %}</td>
+                        <td class="text-center">{% include 'lb_manager/_boolean_icon.html' with value=obj.cmdb_snmp %}</td>
+                        <td class="text-center">{% include 'lb_manager/_boolean_icon.html' with value=obj.cyberark %}</td>
+                        <td class="text-nowrap">
+                            {% if obj.url_cyberark %}
+                                <a href="{{ obj.url_cyberark }}" target="_blank" rel="noopener noreferrer" title="{{ obj.url_cyberark }}">
+                                    <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                                </a>
+                            {% else %}-{% endif %}
+                        </td>
+                        <td>{{ obj.last_modified|default:"-" }}</td>
+                        <td class="text-center text-nowrap">
+                            <a href="{% url 'lb_guest_edit' obj.device %}" class="btn btn-sm btn-outline-primary me-1" title="Edit">
+                                <i class="fa-solid fa-pen"></i>
+                            </a>
+                            <a href="{% url 'lb_guest_delete' obj.device %}" class="btn btn-sm btn-outline-danger" title="Delete">
+                                <i class="fa-solid fa-trash"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ csp_nonce }}">
+$(document).ready(function() {
+    var now = new Date();
+    var pad = function(n) { return n < 10 ? '0' + n : n; };
+    var dateStr = now.getFullYear() + '' + pad(now.getMonth()+1) + '' + pad(now.getDate()) +
+                  '_' + pad(now.getHours()) + '' + pad(now.getMinutes());
+    var filename = 'guest_lb_' + dateStr;
+
+    var hiddenCols = [10, 11];  // URL CyberArk, Last Modified
+    // All columns except Actions (index 12). Column 10 (URL CyberArk) is hidden
+    // in the table but exported; its cell contains an <a> so we extract the href.
+    var exportOpts = {
+        columns: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+        format: {
+            body: function(data, row, col, node) {
+                if (col === 10) {
+                    var a = $(node).find('a');
+                    return a.length ? a.attr('href') : '-';
+                }
+                return data;
+            }
+        }
+    };
+    $('#dataTable').DataTable({
+        pageLength: 25,
+        lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
+        dom: '<"row align-items-center mb-3"<"col-sm-6"l><"col-sm-6 text-end"B>>' +
+             '<"row"<"col-12"f>>' +
+             '<"row"<"col-12"tr>>' +
+             '<"row mt-3 align-items-center"<"col-sm-5"i><"col-sm-7"p>>',
+        buttons: [
+            {
+                extend: 'csvHtml5',
+                text: '<i class="fa-solid fa-file-csv me-1"></i> CSV',
+                className: 'btn btn-outline-secondary btn-sm',
+                filename: filename,
+                exportOptions: exportOpts
+            },
+            {
+                extend: 'excelHtml5',
+                text: '<i class="fa-solid fa-file-excel me-1"></i> Excel',
+                className: 'btn btn-outline-success btn-sm',
+                filename: filename,
+                exportOptions: exportOpts
+            },
+            {
+                extend: 'print',
+                text: '<i class="fa-solid fa-print me-1"></i> Print',
+                className: 'btn btn-outline-primary btn-sm',
+                exportOptions: exportOpts
+            }
+        ],
+        columnDefs: [
+            { targets: hiddenCols, visible: false },
+            { targets: -1, orderable: false }
+        ],
+        responsive: false,
+        language: {
+            search: '',
+            searchPlaceholder: 'Search records...',
+            lengthMenu: 'Show _MENU_ entries',
+            info: 'Showing _START_ to _END_ of _TOTAL_ records',
+            emptyTable: 'No data available',
+            zeroRecords: 'No matching records found'
+        },
+        order: []
+    });
+});
+</script>
+{% endblock %}
