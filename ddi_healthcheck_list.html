@@ -1,0 +1,225 @@
+{% extends 'base.html' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'ddi_inventory_list' %}">DDI</a></li>
+<li class="breadcrumb-item active">DDI Health Checks</li>
+{% endblock %}
+
+{% block page_help %}
+<p class="text-muted small mb-3">
+    <i class="fa-solid fa-heart-pulse text-primary me-1"></i>
+    <strong>DDI Health Checks</strong> — Snapshot diario de salud de cada miembro del Grid Infoblox:
+    estado de servicios DNS/DHCP, métricas de leases e IPAM, backup y recursos de hardware (CPU, RAM, Disco).
+</p>
+<hr class="my-3">
+<p class="fw-semibold mb-2"><i class="fa-solid fa-table text-primary me-1"></i>¿Qué información veo aquí?</p>
+<ul class="small text-muted ps-3">
+    <li class="mb-1"><span class="badge bg-secondary">Grid Status</span> Estado global del miembro dentro del Grid.</li>
+    <li class="mb-1"><span class="badge bg-secondary">DNS / DHCP Service</span> Estado del servicio en ese miembro (WORKING, FAILED, etc.).</li>
+    <li class="mb-1"><span class="badge bg-secondary">DHCP Failover</span> Estado del failover DHCP entre pares.</li>
+    <li class="mb-1"><span class="badge bg-secondary">Networks en Riesgo / Críticas</span> Redes con utilización ≥ 80% / ≥ 90%.</li>
+    <li class="mb-1"><span class="badge bg-secondary">CPU / RAM / Disco</span> Uso de hardware obtenido via SNMP v3.</li>
+</ul>
+<div class="alert alert-info py-2 small mt-2">
+    <i class="fa-solid fa-lightbulb me-1"></i>
+    Los datos son publicados por el playbook Ansible <code>DDI_Healthcheck</code> una vez al día vía API REST.
+    Un <em>Grid Status</em> diferente a "WORKING" indica degradación del servicio.
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">
+            <i class="fa-solid fa-heart-pulse text-primary me-2"></i>DDI Health Checks
+        </h1>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="card card-modern mb-4">
+    <div class="card-header-modern">
+        <h5 class="card-title-modern">
+            <i class="fa-solid fa-filter me-2"></i>Filtros
+        </h5>
+        <button id="btnClearFilters" class="btn btn-sm btn-outline-secondary">
+            <i class="fa-solid fa-xmark me-1"></i>Limpiar
+        </button>
+    </div>
+    <div class="card-body">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label fw-semibold small">FQDN</label>
+                <input type="text" id="filtFqdn" class="form-control form-control-sm" placeholder="Buscar por FQDN…">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-semibold small">Fecha desde</label>
+                <input type="date" id="filtFechaDesde" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-semibold small">Fecha hasta</label>
+                <input type="date" id="filtFechaHasta" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-semibold small">Platform</label>
+                <select id="filtPlatform" class="form-select form-select-sm">
+                    <option value="">Todos</option>
+                    <option value="INFOBLOX">INFOBLOX</option>
+                    <option value="IBVM">IBVM</option>
+                    <option value="VNIOS">VNIOS</option>
+                    <option value="CISCO">CISCO</option>
+                    <option value="RIVERBED">RIVERBED</option>
+                </select>
+            </div>
+            <div class="col-md-1">
+                <button id="btnApplyFilters" class="btn btn-primary btn-sm w-100">
+                    <i class="fa-solid fa-search me-1"></i>Buscar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card card-modern">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table id="dataTable" class="table table-hover datatable mb-0">
+                <thead>
+                    <tr>
+                        <th>FQDN</th>             <!-- 0  -->
+                        <th>Fecha</th>            <!-- 1  -->
+                        <th>Platform</th>         <!-- 2  -->
+                        <th>Grid Status</th>      <!-- 3  -->
+                        <th>DNS Svc</th>          <!-- 4  -->
+                        <th>DNS Zones</th>        <!-- 5  -->
+                        <th>DHCP Svc</th>         <!-- 6  -->
+                        <th>DHCP Failover</th>    <!-- 7  -->
+                        <th>Leases Act.</th>      <!-- 8  -->
+                        <th>Networks</th>         <!-- 9  -->
+                        <th>En Riesgo</th>        <!-- 10 -->
+                        <th>Críticas</th>         <!-- 11 -->
+                        <th>Backup Status</th>    <!-- 12 -->
+                        <th>CPU%</th>             <!-- 13 -->
+                        <th>RAM%</th>             <!-- 14 -->
+                        <th>Disco%</th>           <!-- 15 -->
+                        <th>Uptime (días)</th>    <!-- 16 -->
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ csp_nonce }}">
+// XSS-safe HTML escaping
+function esc(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function statusBadge(v) {
+    if (!v || v === '') return '-';
+    const u = v.toUpperCase();
+    if (u === 'WORKING') return `<span class="badge bg-success">${esc(v)}</span>`;
+    if (u === 'WARNING') return `<span class="badge bg-warning text-dark">${esc(v)}</span>`;
+    if (u === 'FAILED' || u === 'OFFLINE' || u === 'INACTIVE')
+        return `<span class="badge bg-danger">${esc(v)}</span>`;
+    return `<span class="badge bg-secondary">${esc(v)}</span>`;
+}
+
+function pctBadge(v, warnAt, dangerAt) {
+    if (v === null || v === undefined || v === '') return '-';
+    const n = parseInt(v, 10);
+    if (isNaN(n)) return esc(v);
+    if (n >= dangerAt) return `<span class="badge bg-danger">${n}%</span>`;
+    if (n >= warnAt)   return `<span class="badge bg-warning text-dark">${n}%</span>`;
+    return `<span class="badge bg-success">${n}%</span>`;
+}
+
+function countBadge(v, warnAt) {
+    if (v === null || v === undefined) return '-';
+    const n = parseInt(v, 10);
+    if (isNaN(n)) return esc(v);
+    return n >= warnAt
+        ? `<span class="badge bg-danger">${n}</span>`
+        : `<span class="badge bg-success">${n}</span>`;
+}
+
+$(document).ready(function () {
+    var table = initDataTable('#dataTable', {
+        serverSide: true,
+        processing: true,
+        ajax: {
+            url: '{% url "ddi_healthcheck_data" %}',
+            type: 'GET',
+            data: function (d) {
+                d.fqdn        = document.getElementById('filtFqdn').value.trim();
+                d.fecha_desde = document.getElementById('filtFechaDesde').value;
+                d.fecha_hasta = document.getElementById('filtFechaHasta').value;
+                d.platform    = document.getElementById('filtPlatform').value;
+                return d;
+            },
+        },
+        columns: [
+            { data: 0 },   // fqdn
+            { data: 1 },   // fecha
+            { data: 2 },   // platform
+            { data: 3,  render: v => statusBadge(v) },   // grid_status
+            { data: 4,  render: v => statusBadge(v) },   // dns_service
+            { data: 5,  className: 'text-center' },       // dns_zones_count
+            { data: 6,  render: v => statusBadge(v) },   // dhcp_service
+            { data: 7,  render: v => v || '-' },          // dhcp_failover
+            { data: 8,  className: 'text-center' },       // leases_activos
+            { data: 9,  className: 'text-center' },       // networks_total
+            { data: 10, className: 'text-center', render: v => countBadge(v, 1) },  // networks_en_riesgo
+            { data: 11, className: 'text-center', render: v => countBadge(v, 1) },  // networks_criticas
+            { data: 12, render: v => statusBadge(v) },   // backup_status
+            { data: 13, className: 'text-center', render: v => pctBadge(v, 70, 80) },  // cpu_pct
+            { data: 14, className: 'text-center', render: v => pctBadge(v, 80, 90) },  // mem_pct
+            { data: 15, className: 'text-center', render: v => pctBadge(v, 75, 85) },  // disk_pct
+            { data: 16, className: 'text-center' },       // uptime_dias
+        ],
+        columnDefs: [
+            { targets: [5, 8, 9], visible: false },  // hidden by default
+        ],
+        dom: 'Blfrtip',
+        buttons: [
+            {
+                extend: 'colvis',
+                text: '<i class="fa-solid fa-eye me-1"></i>Columns',
+                className: 'btn btn-sm btn-outline-secondary',
+            },
+            {
+                extend: 'excel',
+                text: '<i class="fa-solid fa-file-excel me-1"></i>Excel',
+                className: 'btn btn-sm btn-outline-success',
+                exportOptions: { columns: ':visible' },
+            },
+            {
+                extend: 'csv',
+                text: '<i class="fa-solid fa-file-csv me-1"></i>CSV',
+                className: 'btn btn-sm btn-outline-secondary',
+                exportOptions: { columns: ':visible' },
+            },
+        ],
+        order: [[1, 'desc']],
+        pageLength: 25,
+    });
+
+    // Event listeners — CSP compliant (sin onclick inline)
+    document.getElementById('btnApplyFilters').addEventListener('click', function () {
+        table.ajax.reload();
+    });
+
+    document.getElementById('btnClearFilters').addEventListener('click', function () {
+        document.getElementById('filtFqdn').value        = '';
+        document.getElementById('filtFechaDesde').value  = '';
+        document.getElementById('filtFechaHasta').value  = '';
+        document.getElementById('filtPlatform').value    = '';
+        table.ajax.reload();
+    });
+});
+</script>
+{% endblock %}
