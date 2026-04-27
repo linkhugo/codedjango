@@ -1,0 +1,26 @@
+from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('ddi_manager', '0002_initial'),
+    ]
+
+    operations = [
+        migrations.AddField(
+            model_name='ddidevice',
+            name='tipo',
+            field=models.CharField(
+                blank=True,
+                choices=[
+                    ('Infoblox', 'Infoblox'),
+                    ('Other DNS', 'Other DNS'),
+                    ('NTP', 'NTP'),
+                ],
+                max_length=32,
+                null=True,
+                verbose_name='Tipo',
+            ),
+        ),
+    ]
