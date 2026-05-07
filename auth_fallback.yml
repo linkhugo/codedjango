@@ -1,0 +1,72 @@
+---
+# Playbook: auth_fallback.yml
+#
+# Habilita o deshabilita el fallback a autenticación local cuando
+# el servidor AD/LDAP no responde.
+#
+# IMPORTANTE: Solo aplica a equipos en estado Failover ACTIVE.
+#
+# Uso:
+#   ansible-playbook auth_fallback.yml --ask-vault-pass
+#   ansible-playbook auth_fallback.yml -e auth_fallback_enabled=false --ask-vault-pass
+
+- hosts: f5_devices
+  gather_facts: false
+  vars_files:
+    - vars/f5_common.yml
+    - vars/auth_fallback.yml
+
+  tasks:
+
+    - name: "Bloque principal con cleanup de token"
+      block:
+
+        - name: "Inicializar sesión y verificar Failover Active"
+          ansible.builtin.include_tasks: tasks/f5_init_active.yml
+
+        - name: "Consultar configuración de auth actual de {{ inventory_hostname }}"
+          ansible.builtin.uri:
+            url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/auth/source"
+            method: GET
+            headers:
+              X-F5-Auth-Token: "{{ f5_api_token }}"
+            validate_certs: "{{ f5_validate_certs }}"
+            status_code: 200
+            timeout: 30
+          delegate_to: localhost
+          register: _auth_before
+
+        - name: "Auth — estado ANTES en {{ inventory_hostname }}"
+          ansible.builtin.debug:
+            msg:
+              type:     "{{ _auth_before.json.type | default('none') }}"
+              fallback: "{{ _auth_before.json.fallback | default('none') }}"
+
+        - name: "Configurar fallback de auth en {{ inventory_hostname }}"
+          f5networks.f5_modules.bigip_auth_source:
+            use_fallback_action: "{{ auth_fallback_enabled | bool }}"
+            provider:            "{{ f5_provider }}"
+          no_log: true
+
+        - name: "Consultar configuración de auth actualizada de {{ inventory_hostname }}"
+          ansible.builtin.uri:
+            url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/auth/source"
+            method: GET
+            headers:
+              X-F5-Auth-Token: "{{ f5_api_token }}"
+            validate_certs: "{{ f5_validate_certs }}"
+            status_code: 200
+            timeout: 30
+          delegate_to: localhost
+          register: _auth_after
+
+        - name: "Auth — estado DESPUÉS en {{ inventory_hostname }}"
+          ansible.builtin.debug:
+            msg:
+              type:     "{{ _auth_after.json.type | default('none') }}"
+              fallback: "{{ _auth_after.json.fallback | default('none') }}"
+
+      always:
+
+        - name: "Revocar token iControlREST"
+          ansible.builtin.include_tasks: tasks/f5_revoke_token.yml

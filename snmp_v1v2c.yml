@@ -1,0 +1,74 @@
+---
+# Playbook: snmp_v1v2c.yml
+#
+# Deshabilita SNMPv1 y SNMPv2c en dispositivos F5 BIG-IP.
+# Equivalente a:
+#   tmsh modify sys snmp snmpv1 disable
+#   tmsh modify sys snmp snmpv2c disable
+#
+# IMPORTANTE: Solo aplica a equipos en estado Failover ACTIVE.
+#
+# Uso:
+#   ansible-playbook snmp_v1v2c.yml --ask-vault-pass
+#   ansible-playbook snmp_v1v2c.yml -l lb01 --ask-vault-pass
+
+- hosts: f5_devices
+  gather_facts: false
+  vars_files:
+    - vars/f5_common.yml
+    - vars/snmp_v1v2c.yml
+
+  tasks:
+
+    - name: "Bloque principal con cleanup de token"
+      block:
+
+        - name: "Inicializar sesión y verificar Failover Active"
+          ansible.builtin.include_tasks: tasks/f5_init_active.yml
+
+        - name: "Consultar configuración SNMP actual de {{ inventory_hostname }}"
+          ansible.builtin.uri:
+            url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/sys/snmp"
+            method: GET
+            headers:
+              X-F5-Auth-Token: "{{ f5_api_token }}"
+            validate_certs: "{{ f5_validate_certs }}"
+            status_code: 200
+            timeout: 30
+          delegate_to: localhost
+          register: _snmp_before
+
+        - name: "SNMP — estado ANTES en {{ inventory_hostname }}"
+          ansible.builtin.debug:
+            msg:
+              snmpv1:  "{{ _snmp_before.json.snmpv1  | default('unknown') }}"
+              snmpv2c: "{{ _snmp_before.json.snmpv2c | default('unknown') }}"
+
+        - name: "Deshabilitar SNMPv1 y SNMPv2c en {{ inventory_hostname }}"
+          f5networks.f5_modules.bigip_snmp:
+            snmpv1:   "{{ snmp_v1_state }}"
+            snmpv2c:  "{{ snmp_v2c_state }}"
+            provider: "{{ f5_provider }}"
+
+        - name: "Consultar configuración SNMP actualizada de {{ inventory_hostname }}"
+          ansible.builtin.uri:
+            url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/sys/snmp"
+            method: GET
+            headers:
+              X-F5-Auth-Token: "{{ f5_api_token }}"
+            validate_certs: "{{ f5_validate_certs }}"
+            status_code: 200
+            timeout: 30
+          delegate_to: localhost
+          register: _snmp_after
+
+        - name: "SNMP — estado DESPUÉS en {{ inventory_hostname }}"
+          ansible.builtin.debug:
+            msg:
+              snmpv1:  "{{ _snmp_after.json.snmpv1  | default('unknown') }}"
+              snmpv2c: "{{ _snmp_after.json.snmpv2c | default('unknown') }}"
+
+      always:
+
+        - name: "Revocar token iControlREST"
+          ansible.builtin.include_tasks: tasks/f5_revoke_token.yml

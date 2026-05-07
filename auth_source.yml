@@ -1,0 +1,107 @@
+---
+# Playbook: auth_source.yml
+#
+# Configura la fuente de autenticación remota (Active Directory o LDAP),
+# el fallback a auth local, el rol por defecto y el acceso a consola.
+#
+# IMPORTANTE: Solo aplica a equipos en estado Failover ACTIVE.
+#
+# Uso:
+#   ansible-playbook auth_source.yml --ask-vault-pass
+#   ansible-playbook auth_source.yml -l lb01 --ask-vault-pass
+
+- hosts: f5_devices
+  gather_facts: false
+  vars_files:
+    - vars/f5_common.yml
+    - vars/auth_source.yml
+
+  tasks:
+
+    - name: "Bloque principal con cleanup de token"
+      block:
+
+        - name: "Inicializar sesión y verificar Failover Active"
+          ansible.builtin.include_tasks: tasks/f5_init_active.yml
+
+        - name: "Consultar configuración de auth actual de {{ inventory_hostname }}"
+          ansible.builtin.uri:
+            url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/auth/source"
+            method: GET
+            headers:
+              X-F5-Auth-Token: "{{ f5_api_token }}"
+            validate_certs: "{{ f5_validate_certs }}"
+            status_code: 200
+            timeout: 30
+          delegate_to: localhost
+          register: _auth_before
+
+        - name: "Auth — estado ANTES en {{ inventory_hostname }}"
+          ansible.builtin.debug:
+            msg:
+              type:           "{{ _auth_before.json.type | default('none') }}"
+              fallback:       "{{ _auth_before.json.fallback | default('none') }}"
+
+        - name: "Configurar tipo de auth y fallback en {{ inventory_hostname }}"
+          f5networks.f5_modules.bigip_auth_source:
+            type:                "{{ auth_type }}"
+            use_fallback_action: "{{ auth_fallback | bool }}"
+            provider:            "{{ f5_provider }}"
+          no_log: true
+
+        - name: "Configurar servidores Active Directory en {{ inventory_hostname }}"
+          f5networks.f5_modules.bigip_auth_active_directory:
+            servers:  "{{ auth_servers | default([]) }}"
+            provider: "{{ f5_provider }}"
+          no_log: true
+          when:
+            - auth_type == "active-directory"
+            - auth_servers | default([]) | length > 0
+
+        - name: "Configurar servidores LDAP en {{ inventory_hostname }}"
+          f5networks.f5_modules.bigip_auth_ldap:
+            servers:  "{{ auth_servers | default([]) }}"
+            provider: "{{ f5_provider }}"
+          no_log: true
+          when:
+            - auth_type == "ldap"
+            - auth_servers | default([]) | length > 0
+
+        # Sin módulo nativo para /mgmt/tm/auth/remote-user
+        - name: "Configurar rol por defecto y acceso consola en {{ inventory_hostname }}"
+          ansible.builtin.uri:
+            url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/auth/remote-user"
+            method: PATCH
+            headers:
+              X-F5-Auth-Token: "{{ f5_api_token }}"
+            body_format: json
+            body:
+              defaultRole:         "{{ auth_default_role }}"
+              remoteConsoleAccess: "{{ auth_remote_console }}"
+            validate_certs: "{{ f5_validate_certs }}"
+            status_code: 200
+            timeout: 30
+          delegate_to: localhost
+
+        - name: "Consultar configuración de auth actualizada de {{ inventory_hostname }}"
+          ansible.builtin.uri:
+            url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/auth/source"
+            method: GET
+            headers:
+              X-F5-Auth-Token: "{{ f5_api_token }}"
+            validate_certs: "{{ f5_validate_certs }}"
+            status_code: 200
+            timeout: 30
+          delegate_to: localhost
+          register: _auth_after
+
+        - name: "Auth — estado DESPUÉS en {{ inventory_hostname }}"
+          ansible.builtin.debug:
+            msg:
+              type:     "{{ _auth_after.json.type | default('none') }}"
+              fallback: "{{ _auth_after.json.fallback | default('none') }}"
+
+      always:
+
+        - name: "Revocar token iControlREST"
+          ansible.builtin.include_tasks: tasks/f5_revoke_token.yml

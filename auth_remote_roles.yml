@@ -1,0 +1,95 @@
+---
+# Playbook: auth_remote_roles.yml
+#
+# Crea o actualiza Remote Role Groups para mapear grupos AD/LDAP a roles F5.
+# Idempotente: state present crea el grupo si no existe, lo actualiza si ya existe.
+#
+# IMPORTANTE: Solo aplica a equipos en estado Failover ACTIVE.
+#
+# Uso:
+#   ansible-playbook auth_remote_roles.yml --ask-vault-pass
+#   ansible-playbook auth_remote_roles.yml -l lb01 --ask-vault-pass
+
+- hosts: f5_devices
+  gather_facts: false
+  vars_files:
+    - vars/f5_common.yml
+    - vars/auth_remote_roles.yml
+
+  tasks:
+
+    - name: "Bloque principal con cleanup de token"
+      block:
+
+        - name: "Inicializar sesión y verificar Failover Active"
+          ansible.builtin.include_tasks: tasks/f5_init_active.yml
+
+        - name: "Consultar remote role groups actuales de {{ inventory_hostname }}"
+          ansible.builtin.uri:
+            url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/auth/remote-role/role-info"
+            method: GET
+            headers:
+              X-F5-Auth-Token: "{{ f5_api_token }}"
+            validate_certs: "{{ f5_validate_certs }}"
+            status_code: 200
+            timeout: 30
+          delegate_to: localhost
+          register: _roles_before
+
+        - name: "Remote roles — estado ANTES en {{ inventory_hostname }}"
+          ansible.builtin.debug:
+            msg: >-
+              {{
+                _roles_before.json.items
+                | default([])
+                | map(attribute='name')
+                | list
+                | join(', ')
+                | default('(sin grupos configurados)')
+              }}
+
+        - name: "Crear o actualizar remote role groups en {{ inventory_hostname }}"
+          f5networks.f5_modules.bigip_remote_role:
+            name:          "{{ _role.name }}"
+            line_order:    "{{ _role.line_order | default(1000) }}"
+            attribute:     "{{ _role.attribute }}"
+            access_type:   "{{ _role.access_type | default('all') }}"
+            console:       "{{ _role.console | default('disabled') }}"
+            partition:     "{{ _role.partition | default('Common') }}"
+            assigned_role: "{{ _role.assigned_role | default('operator') }}"
+            state:         present
+            provider:      "{{ f5_provider }}"
+          loop: "{{ auth_remote_role_groups }}"
+          loop_control:
+            loop_var: _role
+            label:    "{{ _role.name }}"
+          no_log: true
+
+        - name: "Consultar remote role groups actualizados de {{ inventory_hostname }}"
+          ansible.builtin.uri:
+            url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/auth/remote-role/role-info"
+            method: GET
+            headers:
+              X-F5-Auth-Token: "{{ f5_api_token }}"
+            validate_certs: "{{ f5_validate_certs }}"
+            status_code: 200
+            timeout: 30
+          delegate_to: localhost
+          register: _roles_after
+
+        - name: "Remote roles — estado DESPUÉS en {{ inventory_hostname }}"
+          ansible.builtin.debug:
+            msg: >-
+              {{
+                _roles_after.json.items
+                | default([])
+                | map(attribute='name')
+                | list
+                | join(', ')
+                | default('(sin grupos configurados)')
+              }}
+
+      always:
+
+        - name: "Revocar token iControlREST"
+          ansible.builtin.include_tasks: tasks/f5_revoke_token.yml

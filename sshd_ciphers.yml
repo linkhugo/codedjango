@@ -1,0 +1,84 @@
+---
+# Playbook: sshd_ciphers.yml
+#
+# Actualiza los algoritmos criptográficos del SSHD en dispositivos F5 BIG-IP.
+# Referencia: F5 KB K49586523
+#
+# IMPORTANTE: Solo aplica a equipos en estado Failover ACTIVE.
+# Los equipos en standby se omiten sin marcar error.
+#
+# Uso:
+#   ansible-playbook sshd_ciphers.yml --ask-vault-pass
+#   ansible-playbook sshd_ciphers.yml -l lb01 --ask-vault-pass
+#
+# Credenciales en vault (inventory/group_vars/f5_devices.vault.yml):
+#   ansible_user, ansible_password
+
+- hosts: f5_devices
+  gather_facts: false
+  vars_files:
+    - vars/sshd_ciphers.yml
+
+  tasks:
+
+    - name: "Bloque principal con cleanup de token"
+      block:
+
+        - name: "Inicializar sesión y verificar Failover Active"
+          ansible.builtin.include_tasks: tasks/f5_init_active.yml
+
+        - name: "Consultar configuración SSHD actual de {{ inventory_hostname }}"
+          ansible.builtin.uri:
+            url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/sys/sshd"
+            method: GET
+            headers:
+              X-F5-Auth-Token: "{{ f5_api_token }}"
+            validate_certs: "{{ f5_validate_certs }}"
+            status_code: 200
+            timeout: 30
+          delegate_to: localhost
+          register: _sshd_before
+
+        - name: "SSHD — estado ANTES en {{ inventory_hostname }}"
+          ansible.builtin.debug:
+            msg: "{{ _sshd_before.json.include | default('(sin include configurado)') }}"
+
+        - name: "Actualizar algoritmos SSHD en {{ inventory_hostname }}"
+          ansible.builtin.uri:
+            url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/sys/sshd"
+            method: PATCH
+            headers:
+              X-F5-Auth-Token: "{{ f5_api_token }}"
+            body_format: json
+            body:
+              include: |
+                Ciphers {{ sshd_ciphers | replace('\n', '') | replace(' ', '') }}
+                MACs {{ sshd_macs | replace('\n', '') | replace(' ', '') }}
+                KexAlgorithms {{ sshd_kex | replace('\n', '') | replace(' ', '') }}
+                HostKeyAlgorithms {{ sshd_hostkeyalgorithms | replace('\n', '') | replace(' ', '') }}
+            validate_certs: "{{ f5_validate_certs }}"
+            status_code: 200
+            timeout: 30
+          delegate_to: localhost
+          register: _sshd_patch
+
+        - name: "Consultar configuración SSHD actualizada de {{ inventory_hostname }}"
+          ansible.builtin.uri:
+            url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/sys/sshd"
+            method: GET
+            headers:
+              X-F5-Auth-Token: "{{ f5_api_token }}"
+            validate_certs: "{{ f5_validate_certs }}"
+            status_code: 200
+            timeout: 30
+          delegate_to: localhost
+          register: _sshd_after
+
+        - name: "SSHD — estado DESPUÉS en {{ inventory_hostname }}"
+          ansible.builtin.debug:
+            msg: "{{ _sshd_after.json.include | default('(sin include configurado)') }}"
+
+      always:
+
+        - name: "Revocar token iControlREST"
+          ansible.builtin.include_tasks: tasks/f5_revoke_token.yml

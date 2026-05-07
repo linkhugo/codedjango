@@ -1,0 +1,83 @@
+---
+# Playbook: auth_servers.yml
+#
+# Modifica la lista de servidores de autenticación AD o LDAP.
+# La lista definida en vars reemplaza la configuración existente.
+#
+# IMPORTANTE: Solo aplica a equipos en estado Failover ACTIVE.
+#
+# Uso:
+#   ansible-playbook auth_servers.yml --ask-vault-pass
+#   ansible-playbook auth_servers.yml -l lb01 --ask-vault-pass
+
+- hosts: f5_devices
+  gather_facts: false
+  vars_files:
+    - vars/f5_common.yml
+    - vars/auth_servers.yml
+  vars:
+    _auth_api_path: >-
+      {{ 'active-directory' if auth_type == 'active-directory' else 'ldap' }}
+
+  tasks:
+
+    - name: "Bloque principal con cleanup de token"
+      block:
+
+        - name: "Inicializar sesión y verificar Failover Active"
+          ansible.builtin.include_tasks: tasks/f5_init_active.yml
+
+        - name: "Consultar servidores de auth actuales de {{ inventory_hostname }}"
+          ansible.builtin.uri:
+            url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/auth/{{ _auth_api_path }}"
+            method: GET
+            headers:
+              X-F5-Auth-Token: "{{ f5_api_token }}"
+            validate_certs: "{{ f5_validate_certs }}"
+            status_code: 200
+            timeout: 30
+          delegate_to: localhost
+          register: _servers_before
+
+        - name: "Servidores — estado ANTES en {{ inventory_hostname }}"
+          ansible.builtin.debug:
+            msg:
+              tipo:       "{{ auth_type }}"
+              servidores: "{{ _servers_before.json.servers | default([]) }}"
+
+        - name: "Actualizar servidores Active Directory en {{ inventory_hostname }}"
+          f5networks.f5_modules.bigip_auth_active_directory:
+            servers:  "{{ auth_servers }}"
+            provider: "{{ f5_provider }}"
+          no_log: true
+          when: auth_type == "active-directory"
+
+        - name: "Actualizar servidores LDAP en {{ inventory_hostname }}"
+          f5networks.f5_modules.bigip_auth_ldap:
+            servers:  "{{ auth_servers }}"
+            provider: "{{ f5_provider }}"
+          no_log: true
+          when: auth_type == "ldap"
+
+        - name: "Consultar servidores de auth actualizados de {{ inventory_hostname }}"
+          ansible.builtin.uri:
+            url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/auth/{{ _auth_api_path }}"
+            method: GET
+            headers:
+              X-F5-Auth-Token: "{{ f5_api_token }}"
+            validate_certs: "{{ f5_validate_certs }}"
+            status_code: 200
+            timeout: 30
+          delegate_to: localhost
+          register: _servers_after
+
+        - name: "Servidores — estado DESPUÉS en {{ inventory_hostname }}"
+          ansible.builtin.debug:
+            msg:
+              tipo:       "{{ auth_type }}"
+              servidores: "{{ _servers_after.json.servers | default([]) }}"
+
+      always:
+
+        - name: "Revocar token iControlREST"
+          ansible.builtin.include_tasks: tasks/f5_revoke_token.yml

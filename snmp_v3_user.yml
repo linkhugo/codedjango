@@ -1,0 +1,95 @@
+---
+# Playbook: snmp_v3_user.yml
+#
+# Crea o modifica un usuario SNMPv3 en dispositivos F5 BIG-IP.
+# Idempotente: state present crea el usuario si no existe, lo actualiza si ya existe.
+#
+# IMPORTANTE: Solo aplica a equipos en estado Failover ACTIVE.
+# Los equipos en standby se omiten sin marcar error.
+#
+# Uso:
+#   ansible-playbook snmp_v3_user.yml --ask-vault-pass
+#   ansible-playbook snmp_v3_user.yml -l lb01 --ask-vault-pass
+#
+# Variables del usuario en:  vars/snmp_v3_user.yml
+# Contraseña en vault:       vault_snmp_v3_auth_password
+
+- hosts: f5_devices
+  gather_facts: false
+  vars_files:
+    - vars/f5_common.yml
+    - vars/snmp_v3_user.yml
+
+  tasks:
+
+    - name: "Bloque principal con cleanup de token"
+      block:
+
+        - name: "Inicializar sesión y verificar Failover Active"
+          ansible.builtin.include_tasks: tasks/f5_init_active.yml
+
+        - name: "Consultar usuarios SNMPv3 actuales de {{ inventory_hostname }}"
+          ansible.builtin.uri:
+            url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/sys/snmp/users"
+            method: GET
+            headers:
+              X-F5-Auth-Token: "{{ f5_api_token }}"
+            validate_certs: "{{ f5_validate_certs }}"
+            status_code: 200
+            timeout: 30
+          delegate_to: localhost
+          register: _snmp_before
+
+        - name: "SNMPv3 — usuarios ANTES en {{ inventory_hostname }}"
+          ansible.builtin.debug:
+            msg: >-
+              {{
+                _snmp_before.json.items
+                | default([])
+                | map(attribute='name')
+                | list
+                | join(', ')
+                | default('(sin usuarios configurados)')
+              }}
+
+        - name: "Crear o actualizar usuario SNMPv3 '{{ snmp_v3_name }}' en {{ inventory_hostname }}"
+          f5networks.f5_modules.bigip_snmp_user:
+            name:             "{{ snmp_v3_name }}"
+            security_level:   "{{ snmp_v3_security_level }}"
+            auth_protocol:    "{{ snmp_v3_auth_protocol }}"
+            auth_password:    "{{ snmp_v3_auth_password }}"
+            oid:              "{{ snmp_v3_oid }}"
+            privacy_protocol: "{{ snmp_v3_privacy_protocol | default(omit) }}"
+            privacy_password: "{{ snmp_v3_privacy_password | default(omit) }}"
+            state:            present
+            provider:         "{{ f5_provider }}"
+          no_log: true
+
+        - name: "Consultar usuarios SNMPv3 actualizados de {{ inventory_hostname }}"
+          ansible.builtin.uri:
+            url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/sys/snmp/users"
+            method: GET
+            headers:
+              X-F5-Auth-Token: "{{ f5_api_token }}"
+            validate_certs: "{{ f5_validate_certs }}"
+            status_code: 200
+            timeout: 30
+          delegate_to: localhost
+          register: _snmp_after
+
+        - name: "SNMPv3 — usuarios DESPUÉS en {{ inventory_hostname }}"
+          ansible.builtin.debug:
+            msg: >-
+              {{
+                _snmp_after.json.items
+                | default([])
+                | map(attribute='name')
+                | list
+                | join(', ')
+                | default('(sin usuarios configurados)')
+              }}
+
+      always:
+
+        - name: "Revocar token iControlREST"
+          ansible.builtin.include_tasks: tasks/f5_revoke_token.yml

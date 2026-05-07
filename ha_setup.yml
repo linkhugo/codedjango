@@ -1,0 +1,836 @@
+---
+# Playbook: ha_setup.yml
+#
+# Configura el par HA: ConfigSync IP (mgmt), Failover unicast IP,
+# MAC masquerade en traffic-group-1 (solo primario) y device group.
+#
+# PREREQUISITO (KB K000140057): habilita configsync.allowmanagement en ambos
+# equipos para que la IP de mgmt pueda usarse como ConfigSync address.
+#
+# IMPORTANTE: Aplica a AMBOS equipos independientemente del estado de failover.
+#
+# Uso:
+#   ansible-playbook ha_setup.yml --ask-vault-pass
+#
+# Credenciales en vault: ha_user, ha_password
+# Variables en:          vars/ha_setup.yml
+
+- hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - vars/ha_setup.yml
+  vars:
+    _provider_primary:
+      server:         "{{ ha_primary.host }}"
+      server_port:    "{{ f5_api_port }}"
+      user:           "{{ ha_user }}"
+      password:       "{{ ha_password }}"
+      validate_certs: "{{ f5_validate_certs }}"
+      auth_provider:  "{{ f5_auth_provider }}"
+
+    _provider_secondary:
+      server:         "{{ ha_secondary.host }}"
+      server_port:    "{{ f5_api_port }}"
+      user:           "{{ ha_user }}"
+      password:       "{{ ha_password }}"
+      validate_certs: "{{ f5_validate_certs }}"
+      auth_provider:  "{{ f5_auth_provider }}"
+
+  tasks:
+
+    # ════════════════════════════════════════════════════════════════════════════
+    # FASE 1 — VALIDACIONES (sin cambios de configuración)
+    # ════════════════════════════════════════════════════════════════════════════
+
+    # ── Conectividad y versión TMOS ───────────────────────────────────────────
+
+    - name: "Verificar conectividad con el primario ({{ ha_primary.host }})"
+      ansible.builtin.uri:
+        url: "https://{{ ha_primary.host }}:{{ f5_api_port }}/mgmt/tm/sys/version"
+        method: GET
+        url_username:     "{{ ha_user }}"
+        url_password:     "{{ ha_password }}"
+        force_basic_auth: true
+        validate_certs:   "{{ f5_validate_certs }}"
+        status_code: 200
+        timeout: 15
+      register: _version_primary
+      no_log: true
+
+    - name: "Verificar conectividad con el secundario ({{ ha_secondary.host }})"
+      ansible.builtin.uri:
+        url: "https://{{ ha_secondary.host }}:{{ f5_api_port }}/mgmt/tm/sys/version"
+        method: GET
+        url_username:     "{{ ha_user }}"
+        url_password:     "{{ ha_password }}"
+        force_basic_auth: true
+        validate_certs:   "{{ f5_validate_certs }}"
+        status_code: 200
+        timeout: 15
+      register: _version_secondary
+      no_log: true
+
+    - name: "Extraer versión TMOS del primario"
+      ansible.builtin.set_fact:
+        _tmos_version_primary: >-
+          {{
+            _version_primary.json
+            | json_query('entries.*.nestedStats.entries.Version.description')
+            | first | default('unknown')
+          }}
+
+    - name: "Extraer versión TMOS del secundario"
+      ansible.builtin.set_fact:
+        _tmos_version_secondary: >-
+          {{
+            _version_secondary.json
+            | json_query('entries.*.nestedStats.entries.Version.description')
+            | first | default('unknown')
+          }}
+
+    - name: "Versiones TMOS detectadas"
+      ansible.builtin.debug:
+        msg:
+          primario:   "{{ _tmos_version_primary }}"
+          secundario: "{{ _tmos_version_secondary }}"
+
+    - name: "Validar que ambos equipos tienen la misma versión TMOS"
+      ansible.builtin.fail:
+        msg: >-
+          Versiones TMOS diferentes — Primario: {{ _tmos_version_primary }},
+          Secundario: {{ _tmos_version_secondary }}.
+          Ambos deben correr la misma versión antes de configurar HA.
+      when: _tmos_version_primary != _tmos_version_secondary
+
+    # ── Advertencia si failover_ip usa la misma IP que mgmt ──────────────────
+
+    - name: "Advertencia — failover_ip igual a mgmt en primario"
+      ansible.builtin.debug:
+        msg: >-
+          ADVERTENCIA: ha_primary.failover_ip ({{ ha_primary.failover_ip }}) coincide
+          con la IP de gestión. F5 recomienda una Self-IP dedicada para failover.
+      when: ha_primary.failover_ip == ha_primary.host
+
+    - name: "Advertencia — failover_ip igual a mgmt en secundario"
+      ansible.builtin.debug:
+        msg: >-
+          ADVERTENCIA: ha_secondary.failover_ip ({{ ha_secondary.failover_ip }}) coincide
+          con la IP de gestión. F5 recomienda una Self-IP dedicada para failover.
+      when: ha_secondary.failover_ip == ha_secondary.host
+
+    # ── NTP — verificar consistencia entre equipos ────────────────────────────
+
+    - name: "Consultar NTP del primario"
+      ansible.builtin.uri:
+        url: "https://{{ ha_primary.host }}:{{ f5_api_port }}/mgmt/tm/sys/ntp"
+        method: GET
+        url_username:     "{{ ha_user }}"
+        url_password:     "{{ ha_password }}"
+        force_basic_auth: true
+        validate_certs:   "{{ f5_validate_certs }}"
+        status_code: 200
+        timeout: 30
+      register: _ntp_primary
+      no_log: true
+
+    - name: "Consultar NTP del secundario"
+      ansible.builtin.uri:
+        url: "https://{{ ha_secondary.host }}:{{ f5_api_port }}/mgmt/tm/sys/ntp"
+        method: GET
+        url_username:     "{{ ha_user }}"
+        url_password:     "{{ ha_password }}"
+        force_basic_auth: true
+        validate_certs:   "{{ f5_validate_certs }}"
+        status_code: 200
+        timeout: 30
+      register: _ntp_secondary
+      no_log: true
+
+    - name: "Validar consistencia de servidores NTP entre equipos"
+      ansible.builtin.fail:
+        msg: >-
+          Servidores NTP diferentes entre equipos.
+          Primario: {{ _ntp_primary.json.servers | default([]) | sort }}.
+          Secundario: {{ _ntp_secondary.json.servers | default([]) | sort }}.
+          Sincroniza NTP antes de continuar.
+      when: >-
+        (_ntp_primary.json.servers | default([]) | sort) !=
+        (_ntp_secondary.json.servers | default([]) | sort)
+
+    # ── Licencia — verificar que ambos equipos estén licenciados ──────────────
+
+    - name: "Verificar licencia del primario"
+      ansible.builtin.uri:
+        url: "https://{{ ha_primary.host }}:{{ f5_api_port }}/mgmt/tm/sys/license"
+        method: GET
+        url_username:     "{{ ha_user }}"
+        url_password:     "{{ ha_password }}"
+        force_basic_auth: true
+        validate_certs:   "{{ f5_validate_certs }}"
+        status_code: 200
+        timeout: 30
+      register: _license_primary
+      no_log: true
+
+    - name: "Verificar licencia del secundario"
+      ansible.builtin.uri:
+        url: "https://{{ ha_secondary.host }}:{{ f5_api_port }}/mgmt/tm/sys/license"
+        method: GET
+        url_username:     "{{ ha_user }}"
+        url_password:     "{{ ha_password }}"
+        force_basic_auth: true
+        validate_certs:   "{{ f5_validate_certs }}"
+        status_code: 200
+        timeout: 30
+      register: _license_secondary
+      no_log: true
+
+    - name: "Validar que el primario tiene licencia activa"
+      ansible.builtin.fail:
+        msg: "El primario ({{ ha_primary.host }}) no tiene licencia activa."
+      when: >-
+        (_license_primary.json.registrationKey | default('')) | length == 0
+
+    - name: "Validar que el secundario tiene licencia activa"
+      ansible.builtin.fail:
+        msg: "El secundario ({{ ha_secondary.host }}) no tiene licencia activa."
+      when: >-
+        (_license_secondary.json.registrationKey | default('')) | length == 0
+
+    # ── Detectar HA existente ─────────────────────────────────────────────────
+
+    - name: "Consultar device groups existentes en el primario"
+      ansible.builtin.uri:
+        url: "https://{{ ha_primary.host }}:{{ f5_api_port }}/mgmt/tm/cm/device-group"
+        method: GET
+        url_username:     "{{ ha_user }}"
+        url_password:     "{{ ha_password }}"
+        force_basic_auth: true
+        validate_certs:   "{{ f5_validate_certs }}"
+        status_code: 200
+        timeout: 30
+      register: _existing_groups
+      no_log: true
+
+    - name: "Identificar device groups sync-failover existentes"
+      ansible.builtin.set_fact:
+        _existing_ha_groups: >-
+          {{
+            _existing_groups.json.items | default([])
+            | selectattr('type', 'equalto', 'sync-failover')
+            | list
+          }}
+
+    - name: "Advertencia — HA ya configurado con el mismo nombre"
+      ansible.builtin.debug:
+        msg: >-
+          ADVERTENCIA: Ya existe un device group '{{ ha_device_group }}' de tipo sync-failover.
+          El playbook actualizará la configuración existente.
+      when: >-
+        _existing_ha_groups | selectattr('name', 'equalto', ha_device_group) | list | length > 0
+
+    - name: "Confirmar sobreescritura de HA existente"
+      ansible.builtin.pause:
+        prompt: "Presiona ENTER para actualizar el HA existente, o Ctrl+C para cancelar"
+      when: >-
+        _existing_ha_groups | selectattr('name', 'equalto', ha_device_group) | list | length > 0
+
+    - name: "Fallo — existe un device group HA con nombre diferente"
+      ansible.builtin.fail:
+        msg: >-
+          Ya existe un device group sync-failover con nombre diferente:
+          {{ _existing_ha_groups | rejectattr('name', 'equalto', ha_device_group)
+             | map(attribute='name') | list | join(', ') }}.
+          Elimínalo o ajusta ha_device_group en vars/ha_setup.yml.
+      when: >-
+        _existing_ha_groups | rejectattr('name', 'equalto', ha_device_group) | list | length > 0
+
+    # ── Self-IPs — port lockdown y flotantes ──────────────────────────────────
+
+    - name: "Consultar Self-IPs del primario"
+      ansible.builtin.uri:
+        url: "https://{{ ha_primary.host }}:{{ f5_api_port }}/mgmt/tm/net/self"
+        method: GET
+        url_username:     "{{ ha_user }}"
+        url_password:     "{{ ha_password }}"
+        force_basic_auth: true
+        validate_certs:   "{{ f5_validate_certs }}"
+        status_code: 200
+        timeout: 30
+      register: _selfips_primary
+      no_log: true
+
+    - name: "Identificar Self-IP de failover del primario ({{ ha_primary.failover_ip }})"
+      ansible.builtin.set_fact:
+        _selfip_primary: >-
+          {{
+            _selfips_primary.json.items | default([])
+            | selectattr('address', 'search', ha_primary.failover_ip)
+            | list | first | default({})
+          }}
+
+    - name: "Self-IP failover primario — port lockdown actual"
+      ansible.builtin.debug:
+        msg:
+          selfip:       "{{ _selfip_primary.name | default('NO ENCONTRADA') }}"
+          allowService: "{{ _selfip_primary.allowService | default('none') }}"
+
+    - name: "Validar port lockdown en Self-IP de failover del primario"
+      ansible.builtin.fail:
+        msg: >-
+          Self-IP '{{ _selfip_primary.name | default(ha_primary.failover_ip) }}' del primario
+          no tiene UDP {{ ha_failover_port }} habilitado.
+          allowService actual: {{ _selfip_primary.allowService | default('none') }}.
+      when:
+        - _selfip_primary.name is defined
+        - "'all' not in (_selfip_primary.allowService | default([]))"
+        - "'default' not in (_selfip_primary.allowService | default([]))"
+        - "'udp:' ~ ha_failover_port not in (_selfip_primary.allowService | default([]))"
+
+    - name: "Consultar Self-IPs del secundario"
+      ansible.builtin.uri:
+        url: "https://{{ ha_secondary.host }}:{{ f5_api_port }}/mgmt/tm/net/self"
+        method: GET
+        url_username:     "{{ ha_user }}"
+        url_password:     "{{ ha_password }}"
+        force_basic_auth: true
+        validate_certs:   "{{ f5_validate_certs }}"
+        status_code: 200
+        timeout: 30
+      register: _selfips_secondary
+      no_log: true
+
+    - name: "Identificar Self-IP de failover del secundario ({{ ha_secondary.failover_ip }})"
+      ansible.builtin.set_fact:
+        _selfip_secondary: >-
+          {{
+            _selfips_secondary.json.items | default([])
+            | selectattr('address', 'search', ha_secondary.failover_ip)
+            | list | first | default({})
+          }}
+
+    - name: "Self-IP failover secundario — port lockdown actual"
+      ansible.builtin.debug:
+        msg:
+          selfip:       "{{ _selfip_secondary.name | default('NO ENCONTRADA') }}"
+          allowService: "{{ _selfip_secondary.allowService | default('none') }}"
+
+    - name: "Validar port lockdown en Self-IP de failover del secundario"
+      ansible.builtin.fail:
+        msg: >-
+          Self-IP '{{ _selfip_secondary.name | default(ha_secondary.failover_ip) }}' del secundario
+          no tiene UDP {{ ha_failover_port }} habilitado.
+          allowService actual: {{ _selfip_secondary.allowService | default('none') }}.
+      when:
+        - _selfip_secondary.name is defined
+        - "'all' not in (_selfip_secondary.allowService | default([]))"
+        - "'default' not in (_selfip_secondary.allowService | default([]))"
+        - "'udp:' ~ ha_failover_port not in (_selfip_secondary.allowService | default([]))"
+
+    - name: "Identificar Self-IPs flotantes del primario"
+      ansible.builtin.set_fact:
+        _floating_selfips_primary: >-
+          {{
+            _selfips_primary.json.items | default([])
+            | selectattr('trafficGroup', 'defined')
+            | rejectattr('trafficGroup', 'search', 'traffic-group-local-only')
+            | list
+          }}
+
+    - name: "Self-IPs flotantes del primario"
+      ansible.builtin.debug:
+        msg: >-
+          {{
+            _floating_selfips_primary
+            | map(attribute='address') | list
+            | join(', ') | default('NINGUNA')
+          }}
+
+    - name: "Validar que el primario tiene Self-IPs flotantes"
+      ansible.builtin.fail:
+        msg: >-
+          El primario ({{ ha_primary.host }}) no tiene Self-IPs flotantes.
+          Configura al menos una Self-IP en traffic-group-1.
+      when: _floating_selfips_primary | length == 0
+
+    - name: "Identificar Self-IPs flotantes del secundario"
+      ansible.builtin.set_fact:
+        _floating_selfips_secondary: >-
+          {{
+            _selfips_secondary.json.items | default([])
+            | selectattr('trafficGroup', 'defined')
+            | rejectattr('trafficGroup', 'search', 'traffic-group-local-only')
+            | list
+          }}
+
+    - name: "Self-IPs flotantes del secundario"
+      ansible.builtin.debug:
+        msg: >-
+          {{
+            _floating_selfips_secondary
+            | map(attribute='address') | list
+            | join(', ') | default('NINGUNA')
+          }}
+
+    - name: "Validar que el secundario tiene Self-IPs flotantes"
+      ansible.builtin.fail:
+        msg: >-
+          El secundario ({{ ha_secondary.host }}) no tiene Self-IPs flotantes.
+          Configura al menos una Self-IP en traffic-group-1.
+      when: _floating_selfips_secondary | length == 0
+
+    # ── VLANs — verificar que existen en ambos equipos ────────────────────────
+
+    - name: "Consultar VLANs del primario"
+      ansible.builtin.uri:
+        url: "https://{{ ha_primary.host }}:{{ f5_api_port }}/mgmt/tm/net/vlan"
+        method: GET
+        url_username:     "{{ ha_user }}"
+        url_password:     "{{ ha_password }}"
+        force_basic_auth: true
+        validate_certs:   "{{ f5_validate_certs }}"
+        status_code: 200
+        timeout: 30
+      register: _vlans_primary
+      no_log: true
+
+    - name: "VLANs del primario"
+      ansible.builtin.debug:
+        msg: "{{ _vlans_primary.json.items | default([]) | map(attribute='name') | list }}"
+
+    - name: "Validar que las VLANs de HA existen en el primario"
+      ansible.builtin.fail:
+        msg: "VLAN '{{ _vlan.name }}' no encontrada en el primario. Créala antes de ejecutar."
+      loop: "{{ ha_vlans }}"
+      loop_control:
+        loop_var: _vlan
+        label:    "{{ _vlan.name }}"
+      when: >-
+        _vlan.name not in (
+          _vlans_primary.json.items | default([]) | map(attribute='name') | list
+        )
+
+    - name: "Consultar VLANs del secundario"
+      ansible.builtin.uri:
+        url: "https://{{ ha_secondary.host }}:{{ f5_api_port }}/mgmt/tm/net/vlan"
+        method: GET
+        url_username:     "{{ ha_user }}"
+        url_password:     "{{ ha_password }}"
+        force_basic_auth: true
+        validate_certs:   "{{ f5_validate_certs }}"
+        status_code: 200
+        timeout: 30
+      register: _vlans_secondary
+      no_log: true
+
+    - name: "VLANs del secundario"
+      ansible.builtin.debug:
+        msg: "{{ _vlans_secondary.json.items | default([]) | map(attribute='name') | list }}"
+
+    - name: "Validar que las VLANs de HA existen en el secundario"
+      ansible.builtin.fail:
+        msg: "VLAN '{{ _vlan.name }}' no encontrada en el secundario. Créala antes de ejecutar."
+      loop: "{{ ha_vlans }}"
+      loop_control:
+        loop_var: _vlan
+        label:    "{{ _vlan.name }}"
+      when: >-
+        _vlan.name not in (
+          _vlans_secondary.json.items | default([]) | map(attribute='name') | list
+        )
+
+    # ── MAC masquerade y ha-order ─────────────────────────────────────────────
+
+    - name: "Obtener información del sistema del primario (base MAC)"
+      f5networks.f5_modules.bigip_device_info:
+        gather_subset:
+          - system-info
+        provider: "{{ _provider_primary }}"
+      register: _sysinfo_primary
+      no_log: true
+
+    - name: "Extraer MAC base del primario"
+      ansible.builtin.set_fact:
+        _base_mac_primary: "{{ _sysinfo_primary.system_info.base_mac_address }}"
+
+    - name: "Calcular MAC masquerade (primer byte + 0x02, KB K3523)"
+      ansible.builtin.set_fact:
+        _mac_masquerade: >-
+          {%- set parts = _base_mac_primary.lower().split(':') -%}
+          {%- set new_byte = '%02x' % (('0x' + parts[0]) | int + 2) -%}
+          {{ new_byte }}:{{ parts[1:] | join(':') }}
+
+    - name: "MAC masquerade calculada"
+      ansible.builtin.debug:
+        msg:
+          base_mac:       "{{ _base_mac_primary }}"
+          mac_masquerade: "{{ _mac_masquerade }}"
+
+    - name: "Obtener hostname del secundario para ha-order y Device Trust"
+      f5networks.f5_modules.bigip_device_info:
+        gather_subset:
+          - system-info
+        provider: "{{ _provider_secondary }}"
+      register: _sysinfo_secondary
+      no_log: true
+
+    - name: "Construir ha-order (primario primero, secundario segundo)"
+      ansible.builtin.set_fact:
+        _ha_order:
+          - "{{ _sysinfo_primary.system_info.hostname }}"
+          - "{{ _sysinfo_secondary.system_info.hostname }}"
+
+    - name: "HA Order definido"
+      ansible.builtin.debug:
+        msg: "{{ _ha_order }}"
+
+    # ── Obtener management IPs ────────────────────────────────────────────────
+
+    - name: "Obtener management IP del primario"
+      ansible.builtin.uri:
+        url: "https://{{ ha_primary.host }}:{{ f5_api_port }}/mgmt/tm/sys/management-ip"
+        method: GET
+        url_username:     "{{ ha_user }}"
+        url_password:     "{{ ha_password }}"
+        force_basic_auth: true
+        validate_certs:   "{{ f5_validate_certs }}"
+        status_code: 200
+        timeout: 30
+      register: _mgmt_ip_primary
+      no_log: true
+
+    - name: "Publicar management IP del primario"
+      ansible.builtin.set_fact:
+        _sync_ip_primary: >-
+          {{ _mgmt_ip_primary.json.items[0].name | ansible.utils.ipaddr('address') }}
+
+    - name: "Obtener management IP del secundario"
+      ansible.builtin.uri:
+        url: "https://{{ ha_secondary.host }}:{{ f5_api_port }}/mgmt/tm/sys/management-ip"
+        method: GET
+        url_username:     "{{ ha_user }}"
+        url_password:     "{{ ha_password }}"
+        force_basic_auth: true
+        validate_certs:   "{{ f5_validate_certs }}"
+        status_code: 200
+        timeout: 30
+      register: _mgmt_ip_secondary
+      no_log: true
+
+    - name: "Publicar management IP del secundario"
+      ansible.builtin.set_fact:
+        _sync_ip_secondary: >-
+          {{ _mgmt_ip_secondary.json.items[0].name | ansible.utils.ipaddr('address') }}
+
+    # ════════════════════════════════════════════════════════════════════════════
+    # FASE 2 — CONFIGURACIÓN (con always: save como safety net)
+    # ════════════════════════════════════════════════════════════════════════════
+
+    - name: "Bloque de configuración HA"
+      block:
+
+        # ── Prerequisito: configsync.allowmanagement (KB K000140057) ─────────
+
+        - name: "Habilitar configsync.allowmanagement en primario"
+          f5networks.f5_modules.bigip_sys_db:
+            key:      "configsync.allowmanagement"
+            value:    "enable"
+            provider: "{{ _provider_primary }}"
+          no_log: true
+
+        - name: "Habilitar configsync.allowmanagement en secundario"
+          f5networks.f5_modules.bigip_sys_db:
+            key:      "configsync.allowmanagement"
+            value:    "enable"
+            provider: "{{ _provider_secondary }}"
+          no_log: true
+
+        # ── Equipo primario ───────────────────────────────────────────────────
+
+        - name: "Consultar configuración HA actual del primario ({{ ha_primary.host }})"
+          ansible.builtin.uri:
+            url: "https://{{ ha_primary.host }}:{{ f5_api_port }}/mgmt/tm/cm/device/~Common/{{ ha_primary.host }}"
+            method: GET
+            url_username:     "{{ ha_user }}"
+            url_password:     "{{ ha_password }}"
+            force_basic_auth: true
+            validate_certs:   "{{ f5_validate_certs }}"
+            status_code: [200, 404]
+            timeout: 30
+          register: _primary_before
+          no_log: true
+
+        - name: "Primario — estado ANTES"
+          ansible.builtin.debug:
+            msg:
+              config_sync_ip:   "{{ _primary_before.json.configsyncIp | default('none') }}"
+              unicast_failover: "{{ _primary_before.json.unicastAddress | default([]) }}"
+
+        - name: "Configurar ConfigSync y Failover unicast en primario"
+          f5networks.f5_modules.bigip_device_connectivity:
+            config_sync_ip:  "{{ _sync_ip_primary }}"
+            unicast_failover:
+              - address: "{{ ha_primary.failover_ip }}"
+                port:    "{{ ha_failover_port }}"
+            provider: "{{ _provider_primary }}"
+          no_log: true
+
+        - name: "Configurar MAC masquerade y ha-order en traffic-group-1"
+          f5networks.f5_modules.bigip_traffic_group:
+            name:        "traffic-group-1"
+            mac_address: "{{ _mac_masquerade }}"
+            ha_order:    "{{ _ha_order }}"
+            state:       present
+            provider:    "{{ _provider_primary }}"
+          no_log: true
+
+        - name: "Configurar failoverMethod=ha-order en traffic-group-1"
+          ansible.builtin.uri:
+            url: "https://{{ ha_primary.host }}:{{ f5_api_port }}/mgmt/tm/cm/traffic-group/~Common~traffic-group-1"
+            method: PATCH
+            url_username:     "{{ ha_user }}"
+            url_password:     "{{ ha_password }}"
+            force_basic_auth: true
+            body_format:      json
+            body:
+              failoverMethod: "ha-order"
+            validate_certs:   "{{ f5_validate_certs }}"
+            status_code: 200
+            timeout: 30
+          no_log: true
+
+        - name: "Crear device group HA en primario"
+          f5networks.f5_modules.bigip_device_group:
+            name:              "{{ ha_device_group }}"
+            type:              "sync-failover"
+            network_failover:  true
+            auto_sync:         "{{ ha_auto_sync }}"
+            save_on_auto_sync: "{{ ha_save_on_auto_sync }}"
+            state:             present
+            provider:          "{{ _provider_primary }}"
+          no_log: true
+
+        - name: "Configurar VLAN FailSafe en primario — {{ _vlan.name }}"
+          f5networks.f5_modules.bigip_vlan:
+            name:              "{{ _vlan.name }}"
+            fail_safe:         "{{ _vlan.failsafe | default('enabled') }}"
+            fail_safe_action:  "{{ _vlan.failsafe_action | default('failover') }}"
+            fail_safe_timeout: "{{ _vlan.failsafe_timeout | default(90) }}"
+            state:             present
+            provider:          "{{ _provider_primary }}"
+          loop: "{{ ha_vlans }}"
+          loop_control:
+            loop_var: _vlan
+            label:    "{{ _vlan.name }}"
+          when: ha_vlans | length > 0
+
+        - name: "Primario — estado DESPUÉS"
+          ansible.builtin.uri:
+            url: "https://{{ ha_primary.host }}:{{ f5_api_port }}/mgmt/tm/cm/device/~Common/{{ ha_primary.host }}"
+            method: GET
+            url_username:     "{{ ha_user }}"
+            url_password:     "{{ ha_password }}"
+            force_basic_auth: true
+            validate_certs:   "{{ f5_validate_certs }}"
+            status_code: [200, 404]
+            timeout: 30
+          register: _primary_after
+          no_log: true
+
+        - name: "Primario — debug DESPUÉS"
+          ansible.builtin.debug:
+            msg:
+              config_sync_ip:   "{{ _primary_after.json.configsyncIp | default('none') }}"
+              unicast_failover: "{{ _primary_after.json.unicastAddress | default([]) }}"
+
+        # ── Equipo secundario ─────────────────────────────────────────────────
+
+        - name: "Consultar configuración HA actual del secundario ({{ ha_secondary.host }})"
+          ansible.builtin.uri:
+            url: "https://{{ ha_secondary.host }}:{{ f5_api_port }}/mgmt/tm/cm/device/~Common/{{ ha_secondary.host }}"
+            method: GET
+            url_username:     "{{ ha_user }}"
+            url_password:     "{{ ha_password }}"
+            force_basic_auth: true
+            validate_certs:   "{{ f5_validate_certs }}"
+            status_code: [200, 404]
+            timeout: 30
+          register: _secondary_before
+          no_log: true
+
+        - name: "Secundario — estado ANTES"
+          ansible.builtin.debug:
+            msg:
+              config_sync_ip:   "{{ _secondary_before.json.configsyncIp | default('none') }}"
+              unicast_failover: "{{ _secondary_before.json.unicastAddress | default([]) }}"
+
+        - name: "Configurar ConfigSync y Failover unicast en secundario"
+          f5networks.f5_modules.bigip_device_connectivity:
+            config_sync_ip:  "{{ _sync_ip_secondary }}"
+            unicast_failover:
+              - address: "{{ ha_secondary.failover_ip }}"
+                port:    "{{ ha_failover_port }}"
+            provider: "{{ _provider_secondary }}"
+          no_log: true
+
+        - name: "Secundario — estado DESPUÉS"
+          ansible.builtin.uri:
+            url: "https://{{ ha_secondary.host }}:{{ f5_api_port }}/mgmt/tm/cm/device/~Common/{{ ha_secondary.host }}"
+            method: GET
+            url_username:     "{{ ha_user }}"
+            url_password:     "{{ ha_password }}"
+            force_basic_auth: true
+            validate_certs:   "{{ f5_validate_certs }}"
+            status_code: [200, 404]
+            timeout: 30
+          register: _secondary_after
+          no_log: true
+
+        - name: "Secundario — debug DESPUÉS"
+          ansible.builtin.debug:
+            msg:
+              config_sync_ip:   "{{ _secondary_after.json.configsyncIp | default('none') }}"
+              unicast_failover: "{{ _secondary_after.json.unicastAddress | default([]) }}"
+
+        # ── Device Trust ──────────────────────────────────────────────────────
+
+        - name: "Establecer Device Trust desde primario hacia secundario"
+          f5networks.f5_modules.bigip_device_trust:
+            peer_server:   "{{ ha_secondary.host }}"
+            peer_hostname: "{{ _sysinfo_secondary.system_info.hostname }}"
+            peer_user:     "{{ ha_user }}"
+            peer_password: "{{ ha_password }}"
+            type:          peer
+            state:         present
+            provider:      "{{ _provider_primary }}"
+          no_log: true
+
+        - name: "Esperar que el Device Trust complete — secundario visible desde primario"
+          ansible.builtin.uri:
+            url: "https://{{ ha_primary.host }}:{{ f5_api_port }}/mgmt/tm/cm/device"
+            method: GET
+            url_username:     "{{ ha_user }}"
+            url_password:     "{{ ha_password }}"
+            force_basic_auth: true
+            validate_certs:   "{{ f5_validate_certs }}"
+            status_code: 200
+            timeout: 30
+          register: _cm_devices
+          until: >-
+            _sysinfo_secondary.system_info.hostname in (
+              _cm_devices.json.items | default([]) | map(attribute='hostname') | list
+            )
+          retries: 12
+          delay: 10
+          no_log: true
+
+        - name: "Trust bidireccional confirmado — secundario en trust domain"
+          ansible.builtin.debug:
+            msg: >-
+              {{ _sysinfo_secondary.system_info.hostname }} visible en el trust domain
+              del primario tras {{ _cm_devices.attempts | default(1) }} intento(s).
+
+        # ── Miembros del device group ─────────────────────────────────────────
+
+        - name: "Agregar primario al device group '{{ ha_device_group }}'"
+          f5networks.f5_modules.bigip_device_group_member:
+            name:         "{{ _sysinfo_primary.system_info.hostname }}"
+            device_group: "{{ ha_device_group }}"
+            state:        present
+            provider:     "{{ _provider_primary }}"
+          no_log: true
+
+        - name: "Agregar secundario al device group '{{ ha_device_group }}'"
+          f5networks.f5_modules.bigip_device_group_member:
+            name:         "{{ _sysinfo_secondary.system_info.hostname }}"
+            device_group: "{{ ha_device_group }}"
+            state:        present
+            provider:     "{{ _provider_primary }}"
+          no_log: true
+
+        # ── Guardar configuración antes del sync ──────────────────────────────
+
+        - name: "Guardar configuración en primario"
+          f5networks.f5_modules.bigip_config:
+            save:     true
+            provider: "{{ _provider_primary }}"
+
+        - name: "Guardar configuración en secundario"
+          f5networks.f5_modules.bigip_config:
+            save:     true
+            provider: "{{ _provider_secondary }}"
+
+        # ── Sync inicial ──────────────────────────────────────────────────────
+
+        - name: "Sincronización inicial al device group '{{ ha_device_group }}'"
+          f5networks.f5_modules.bigip_configsync_action:
+            device_group:         "{{ ha_device_group }}"
+            sync_device_to_group: true
+            provider:             "{{ _provider_primary }}"
+
+        - name: "Esperar y verificar que el sync completó (máx. 2 minutos)"
+          ansible.builtin.uri:
+            url: "https://{{ ha_primary.host }}:{{ f5_api_port }}/mgmt/tm/cm/sync-status"
+            method: GET
+            url_username:     "{{ ha_user }}"
+            url_password:     "{{ ha_password }}"
+            force_basic_auth: true
+            validate_certs:   "{{ f5_validate_certs }}"
+            status_code: 200
+            timeout: 30
+          register: _sync_final
+          until: >-
+            (_sync_final.json
+            | json_query('entries.*.nestedStats.entries.status.description')
+            | first | default('') | lower) == 'in sync'
+          retries: 12
+          delay: 10
+          no_log: true
+
+        - name: "Estado final del sync"
+          ansible.builtin.debug:
+            msg: >-
+              {{
+                _sync_final.json
+                | json_query('entries.*.nestedStats.entries.status.description')
+                | first | default('desconocido')
+              }}
+
+        # ── Verificar que el secundario recibió la config ─────────────────────
+
+        - name: "Verificar que el device group llegó al secundario"
+          ansible.builtin.uri:
+            url: "https://{{ ha_secondary.host }}:{{ f5_api_port }}/mgmt/tm/cm/device-group/~Common~{{ ha_device_group }}"
+            method: GET
+            url_username:     "{{ ha_user }}"
+            url_password:     "{{ ha_password }}"
+            force_basic_auth: true
+            validate_certs:   "{{ f5_validate_certs }}"
+            status_code: [200, 404]
+            timeout: 30
+          register: _dg_verify
+          no_log: true
+
+        - name: "Validar que el device group existe en el secundario"
+          ansible.builtin.fail:
+            msg: >-
+              El device group '{{ ha_device_group }}' no se encontró en el secundario.
+              El sync no transfirió la configuración correctamente.
+          when: _dg_verify.status == 404
+
+      always:
+
+        # ── Safety net: guardar config incluso si el bloque falló ─────────────
+
+        - name: "Guardar configuración en primario (always)"
+          f5networks.f5_modules.bigip_config:
+            save:     true
+            provider: "{{ _provider_primary }}"
+          ignore_errors: true
+
+        - name: "Guardar configuración en secundario (always)"
+          f5networks.f5_modules.bigip_config:
+            save:     true
+            provider: "{{ _provider_secondary }}"
+          ignore_errors: true
