@@ -1,0 +1,22 @@
+---
+# Inicializa la sesión iControlREST y verifica que el equipo esté en Failover Active.
+# Si el equipo está en standby, ejecuta meta: end_host — el token se revoca
+# igual en el bloque always: del playbook padre.
+#
+# Requiere:
+#   - lb_user / lb_pass, f5_api_port, f5_validate_certs, f5_auth_provider
+#   - f5_token_timeout
+#
+# Publica:
+#   - f5_api_token : token activo para el resto de las tareas
+#   - failover     : "active for Xd HH:MM:SS" | "standby ..." | "unknown"
+
+- name: "Obtener token iControlREST"
+  ansible.builtin.include_tasks: tasks/f5_get_token.yml
+
+- name: "Consultar estado de failover"
+  ansible.builtin.include_tasks: tasks/f5_get_failover_status.yml
+
+- name: "Omitir equipo en standby: {{ inventory_hostname }} ({{ failover }})"
+  ansible.builtin.meta: end_host
+  when: not (failover | lower is match('active'))
