@@ -1,0 +1,135 @@
+{% extends 'base.html' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item active">Equipos Decomisados</li>
+{% endblock %}
+
+{% block page_help %}
+<p class="text-muted small mb-3">
+    <i class="fa-solid fa-trash-can-arrow-up text-danger me-1"></i>
+    <strong>Historial de Decomisiones</strong> — Registro de todos los equipos LBPhysical y LBGuest
+    que han sido eliminados del inventario, con el snapshot de sus datos y el motivo del decomiso.
+</p>
+<hr class="my-3">
+<ul class="small text-muted ps-3 mb-0">
+    <li class="mb-1">Los registros son <strong>inmutables</strong>: no se pueden editar ni borrar desde la interfaz.</li>
+    <li class="mb-1">El campo <strong>Comments</strong> refleja el motivo indicado por el operador al momento del decomiso.</li>
+</ul>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">
+            <i class="fa-solid fa-trash-can-arrow-up text-danger me-2"></i>Equipos Decomisados
+        </h1>
+        <p class="text-muted">Total: <strong>{{ objects|length }}</strong> registros</p>
+    </div>
+</div>
+
+<div class="card card-modern">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table id="dataTable" class="table table-hover table-sm datatable mb-0 small">
+                <thead>
+                    <tr>
+                        <th>Device</th>
+                        <th>Tipo</th>
+                        <th>Environment</th>
+                        <th>Company</th>
+                        <th>Version</th>
+                        <th>Model</th>
+                        <th>Serial</th>
+                        <th>Mgmt IP</th>
+                        <th>Decomisado el</th>
+                        <th>Por</th>
+                        <th>Comentarios</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for obj in objects %}
+                    <tr>
+                        <td class="text-nowrap fw-bold">{{ obj.device }}</td>
+                        <td>
+                            {% if obj.device_type == 'Physical' %}
+                                <span class="badge bg-primary">Physical</span>
+                            {% else %}
+                                <span class="badge bg-info text-dark">Guest</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ obj.environment|default:"-" }}</td>
+                        <td>{{ obj.company|default:"-" }}</td>
+                        <td class="text-nowrap">{{ obj.version|default:"-" }}</td>
+                        <td class="text-nowrap">{{ obj.model|default:"-" }}</td>
+                        <td><code class="small">{{ obj.serial|default:"-" }}</code></td>
+                        <td><code class="small">{{ obj.mgmt_ip|default:"-" }}</code></td>
+                        <td class="text-nowrap text-muted small">{{ obj.decommissioned_at|date:"Y-m-d H:i" }}</td>
+                        <td class="text-nowrap small">
+                            {% if obj.decommissioned_by %}
+                                {{ obj.decommissioned_by.get_full_name|default:obj.decommissioned_by.username }}
+                            {% else %}-{% endif %}
+                        </td>
+                        <td class="small text-muted mw-260">
+                            {% if obj.comments %}
+                                <span title="{{ obj.comments }}">{{ obj.comments|truncatechars:80 }}</span>
+                            {% else %}-{% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="11" class="text-center text-muted py-5">
+                            <i class="fa-solid fa-inbox fa-2x mb-3 d-block"></i>
+                            No hay equipos decomisados registrados.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ csp_nonce }}">
+$(document).ready(function () {
+    const filename = 'decommissioned_lb_{% now "Y-m-d" %}';
+    const exportOpts = { columns: ':not(:last-child)' };
+
+    initDataTable('#dataTable', {
+        pageLength: 25,
+        lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
+        dom: '<"row align-items-center mb-3"<"col-sm-6"l><"col-sm-6 text-end"B>>' +
+             '<"row"<"col-12"f>>' +
+             '<"row"<"col-12"tr>>' +
+             '<"row mt-3 align-items-center"<"col-sm-5"i><"col-sm-7"p>>',
+        buttons: [
+            {
+                extend: 'csvHtml5',
+                text: '<i class="fa-solid fa-file-csv me-1"></i> CSV',
+                className: 'btn btn-outline-secondary btn-sm',
+                filename: filename,
+                exportOptions: exportOpts,
+            },
+            {
+                extend: 'excelHtml5',
+                text: '<i class="fa-solid fa-file-excel me-1"></i> Excel',
+                className: 'btn btn-outline-success btn-sm',
+                filename: filename,
+                exportOptions: exportOpts,
+            },
+        ],
+        responsive: false,
+        language: {
+            search: '',
+            searchPlaceholder: 'Search records...',
+            lengthMenu: 'Show _MENU_ entries',
+            info: 'Showing _START_ to _END_ of _TOTAL_ records',
+            emptyTable: 'No data available',
+            zeroRecords: 'No matching records found',
+        },
+        order: [[8, 'desc']],
+    });
+});
+</script>
+{% endblock %}
