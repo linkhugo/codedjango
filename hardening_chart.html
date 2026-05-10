@@ -1,0 +1,376 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'lb_hardening_list' %}">Hardening LB</a></li>
+<li class="breadcrumb-item active">Gráfica</li>
+{% endblock %}
+
+{% block page_help %}
+<p class="text-muted small mb-3">
+    <i class="fa-solid fa-chart-pie text-primary me-1"></i>
+    <strong>Gráfica de Hardening</strong> — Visualización del estado de seguridad de los equipos balanceadores: qué porcentaje de verificaciones de seguridad pasaron o fallaron en un período determinado.
+</p>
+<hr class="my-3">
+<p class="fw-semibold mb-2"><i class="fa-solid fa-table text-primary me-1"></i>¿Qué información veo aquí?</p>
+<ul class="small text-muted ps-3">
+    <li class="mb-1"><span class="badge bg-success">Passed</span> Verificaciones de seguridad que el equipo cumple correctamente.</li>
+    <li class="mb-1"><span class="badge bg-danger">Failed</span> Verificaciones de seguridad que el equipo no está cumpliendo.</li>
+    <li class="mb-1">Filtra por mes, año y equipo específico para ver el detalle de un dispositivo.</li>
+</ul>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">
+            <i class="fa-solid fa-chart-pie text-primary me-2"></i>Gráfica Hardening LB
+        </h1>
+        <p class="text-muted">Passed vs Failed por rango de fechas y equipo</p>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="card card-modern mb-4">
+    <div class="card-body py-3">
+        <div class="row g-3 align-items-end">
+            <!-- Company -->
+            <div class="col-md-3">
+                <label class="form-label mb-1 small fw-semibold">Company</label>
+                <select id="companyFilter" class="form-select form-select-sm">
+                    <option value="">— Todas —</option>
+                    {% for co in companies %}
+                    <option value="{{ co.client_code }}">{{ co.name }} — {{ co.client_code }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <!-- Mes -->
+            <div class="col-md-2">
+                <label class="form-label mb-1 small fw-semibold">Mes</label>
+                <select id="monthFrom" class="form-select form-select-sm">
+                    <option value="01">Enero</option><option value="02">Febrero</option>
+                    <option value="03">Marzo</option><option value="04">Abril</option>
+                    <option value="05">Mayo</option><option value="06">Junio</option>
+                    <option value="07">Julio</option><option value="08">Agosto</option>
+                    <option value="09">Septiembre</option><option value="10">Octubre</option>
+                    <option value="11">Noviembre</option><option value="12">Diciembre</option>
+                </select>
+            </div>
+            <!-- Año -->
+            <div class="col-md-2">
+                <label class="form-label mb-1 small fw-semibold">Año</label>
+                <select id="yearFrom" class="form-select form-select-sm"></select>
+            </div>
+            <!-- Device -->
+            <div class="col-md-3">
+                <label class="form-label mb-1 small fw-semibold">Device</label>
+                <select id="deviceFilter" class="form-select form-select-sm">
+                    <option value="">— Global (todos los equipos) —</option>
+                    {% for d in devices %}
+                    <option value="{{ d }}">{{ d }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button id="btnApply" class="btn btn-primary btn-sm w-100">
+                    <i class="fa-solid fa-magnifying-glass me-1"></i>Aplicar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Contenido -->
+<div id="chartSection" class="d-none">
+    <!-- Stat cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-4">
+            <div class="stat-card stat-card-primary">
+                <div class="stat-icon"><i class="fa-solid fa-list-check"></i></div>
+                <div class="stat-info">
+                    <div class="stat-value" id="statTotal">—</div>
+                    <div class="stat-label">Total Registros</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-card stat-card-success">
+                <div class="stat-icon"><i class="fa-solid fa-circle-check"></i></div>
+                <div class="stat-info">
+                    <div class="stat-value" id="statPassed">—</div>
+                    <div class="stat-label">Passed</div>
+                    <div class="mt-1">
+                        <span class="badge bg-success bg-opacity-75" id="statPassedPct">—</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-card stat-card-primary">
+                <div class="stat-icon"><i class="fa-solid fa-circle-xmark"></i></div>
+                <div class="stat-info">
+                    <div class="stat-value" id="statFailed">—</div>
+                    <div class="stat-label">Failed</div>
+                    <div class="mt-1">
+                        <span class="badge bg-danger bg-opacity-75" id="statFailedPct">—</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pie chart -->
+    <div class="row justify-content-center">
+        <div class="col-md-7">
+            <div class="card card-modern">
+                <div class="card-header-modern">
+                    <div>
+                        <h5 class="card-title-modern mb-0">
+                            <i class="fa-solid fa-chart-pie me-2"></i>
+                            <span id="chartTitle">Distribución de Resultados</span>
+                        </h5>
+                        <span id="chartSubtitle" class="text-muted small"></span>
+                    </div>
+                    <button id="btnDownload" class="btn btn-sm btn-outline-secondary">
+                        <i class="fa-solid fa-download me-1"></i>Descargar imagen
+                    </button>
+                </div>
+                <div class="card-body d-flex justify-content-center chart-h-400">
+                    <canvas id="hardeningPieChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sin datos -->
+<div id="noDataSection" class="d-none">
+    <div class="text-center text-muted py-5">
+        <i class="fa-solid fa-inbox fa-3x mb-3 d-block"></i>
+        No hay registros para el rango y equipo seleccionados.
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'vendor/chartjs/chartjs-plugin-datalabels.min.js' %}"></script>
+<script nonce="{{ csp_nonce }}">
+Chart.register(ChartDataLabels);
+
+let pieChart = null;
+let lastData  = null;
+
+const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                 'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+// Mapa device → client_code para filtrar el dropdown de Device según Company
+const DEVICE_COMPANY_MAP = {{ device_company_map|safe }};
+
+// Populate year select (current year back 5 years)
+(function () {
+    const today    = new Date();
+    const curYear  = today.getFullYear();
+    const curMonth = String(today.getMonth() + 1).padStart(2, '0');
+
+    const sel = document.getElementById('yearFrom');
+    for (let y = curYear; y >= curYear - 5; y--) {
+        const opt = document.createElement('option');
+        opt.value = y;
+        opt.textContent = y;
+        sel.appendChild(opt);
+    }
+
+    document.getElementById('monthFrom').value = curMonth;
+})();
+
+// Returns last day of a given month/year
+function lastDay(year, month) {
+    return new Date(year, parseInt(month), 0).getDate();
+}
+
+// Build date strings from selects (full month range)
+function getDateRange() {
+    const month = document.getElementById('monthFrom').value;
+    const year  = document.getElementById('yearFrom').value;
+    const last  = String(lastDay(year, month)).padStart(2, '0');
+    const label = `${MONTHS[parseInt(month)-1]} ${year}`;
+    return {
+        dateFrom:  `${year}-${month}-01`,
+        dateTo:    `${year}-${month}-${last}`,
+        labelFrom: label,
+        labelTo:   label,
+    };
+}
+
+// Filtrar opciones de Device según Company seleccionada
+document.getElementById('companyFilter').addEventListener('change', function () {
+    const co  = this.value;
+    const sel = document.getElementById('deviceFilter');
+    sel.value = '';
+    Array.from(sel.options).forEach(function (opt) {
+        if (!opt.value) return; // opción "— Global —"
+        opt.hidden = co ? (DEVICE_COMPANY_MAP[opt.value] !== co) : false;
+    });
+});
+
+document.getElementById('btnApply').addEventListener('click', loadChart);
+
+// Download button — adds title + subtitle burned into the image
+document.getElementById('btnDownload').addEventListener('click', function () {
+    if (!pieChart) return;
+
+    const canvas      = document.getElementById('hardeningPieChart');
+    const device      = document.getElementById('deviceFilter').value || 'Global';
+    const { labelFrom, labelTo, dateFrom, dateTo } = getDateRange();
+    const titleText   = device;
+    const subtitleTxt = labelFrom;
+    const padding     = 60;
+
+    const offscreen = document.createElement('canvas');
+    offscreen.width  = canvas.width;
+    offscreen.height = canvas.height + padding;
+
+    const ctx = offscreen.getContext('2d');
+    // White background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, offscreen.width, offscreen.height);
+
+    // Title (device name)
+    ctx.fillStyle  = '#1a1a2e';
+    ctx.font       = 'bold 16px sans-serif';
+    ctx.textAlign  = 'center';
+    ctx.fillText(titleText, offscreen.width / 2, 24);
+
+    // Subtitle (date range)
+    ctx.fillStyle  = '#6c757d';
+    ctx.font       = '13px sans-serif';
+    ctx.fillText(subtitleTxt, offscreen.width / 2, 44);
+
+    // Chart
+    ctx.drawImage(canvas, 0, padding);
+
+    const link    = document.createElement('a');
+    link.download = `hardening_${device}_${dateFrom}_${dateTo}.png`;
+    link.href     = offscreen.toDataURL('image/png');
+    link.click();
+});
+
+function buildChartOptions(total) {
+    return {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: {
+                    font: { size: 13 },
+                    padding: 20,
+                    generateLabels: chart => {
+                        const ds  = chart.data.datasets[0];
+                        return chart.data.labels.map((label, i) => ({
+                            text:            `${label}: ${ds.data[i]} (${(ds.data[i] / total * 100).toFixed(1)}%)`,
+                            fillStyle:       ds.backgroundColor[i],
+                            strokeStyle:     '#fff',
+                            lineWidth:       2,
+                            hidden:          false,
+                            index:           i,
+                        }));
+                    },
+                },
+            },
+            tooltip: {
+                callbacks: {
+                    label: ctx => {
+                        const val = ctx.parsed;
+                        const pct = (val / total * 100).toFixed(1);
+                        return ` ${ctx.label}: ${val} (${pct}%)`;
+                    }
+                }
+            },
+            datalabels: {
+                color: '#fff',
+                font: { size: 14, weight: 'bold' },
+                formatter: (value, ctx) => {
+                    if (value === 0) return '';
+                    const pct = (value / total * 100).toFixed(1);
+                    return `${value}\n${pct}%`;
+                },
+                textAlign: 'center',
+                display: ctx => ctx.dataset.data[ctx.dataIndex] > 0,
+            },
+        }
+    };
+}
+
+function loadChart() {
+    const { dateFrom, dateTo, labelFrom, labelTo } = getDateRange();
+    const device  = document.getElementById('deviceFilter').value;
+    const company = document.getElementById('companyFilter').value;
+
+    const params = new URLSearchParams({ date_from: dateFrom, date_to: dateTo, device, company });
+
+    fetch(`{% url 'hardening_chart_data' %}?${params}`)
+        .then(r => r.json())
+        .then(data => {
+            lastData = data;
+
+            if (data.total === 0) {
+                document.getElementById('chartSection').classList.add('d-none');
+                document.getElementById('noDataSection').classList.remove('d-none');
+                return;
+            }
+
+            document.getElementById('noDataSection').classList.add('d-none');
+            document.getElementById('chartSection').classList.remove('d-none');
+
+            // Stat cards
+            document.getElementById('statTotal').textContent     = data.total;
+            document.getElementById('statPassed').textContent    = data.passed;
+            document.getElementById('statFailed').textContent    = data.failed;
+            document.getElementById('statPassedPct').textContent = data.passed_pct + '%';
+            document.getElementById('statFailedPct').textContent = data.failed_pct + '%';
+
+            // Chart title & subtitle
+            const deviceLabel = device || 'Todos los equipos';
+            document.getElementById('chartTitle').textContent    = deviceLabel;
+            document.getElementById('chartSubtitle').textContent = labelFrom;
+
+            // Pie chart data
+            const labels = ['Passed', 'Failed'];
+            const counts = [data.passed, data.failed];
+            const colors = ['#198754', '#dc3545'];
+
+            if (data.other > 0) {
+                labels.push('Otros');
+                counts.push(data.other);
+                colors.push('#6c757d');
+            }
+
+            if (pieChart) {
+                pieChart.data.labels                      = labels;
+                pieChart.data.datasets[0].data            = counts;
+                pieChart.data.datasets[0].backgroundColor = colors;
+                pieChart.options = buildChartOptions(data.total);
+                pieChart.update();
+            } else {
+                pieChart = new Chart(document.getElementById('hardeningPieChart'), {
+                    type: 'pie',
+                    data: {
+                        labels,
+                        datasets: [{
+                            data:            counts,
+                            backgroundColor: colors,
+                            borderWidth:     3,
+                            borderColor:     '#fff',
+                        }]
+                    },
+                    options: buildChartOptions(data.total),
+                });
+            }
+        });
+}
+
+// Auto-load on page open
+loadChart();
+</script>
+{% endblock %}
