@@ -1,0 +1,205 @@
+{% extends 'base.html' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'vip_list' %}">VIPs</a></li>
+<li class="breadcrumb-item active">Histórico</li>
+{% endblock %}
+
+{% block page_help %}
+<p class="text-muted small mb-3">
+    <i class="fa-solid fa-clock-rotate-left text-primary me-1"></i>
+    <strong>VIPs Histórico</strong> — Registro histórico de las configuraciones de las VIPs a lo largo del tiempo. Cada fila es una "fotografía" de cómo estaba configurada una VIP en un momento determinado.
+</p>
+<hr class="my-3">
+<p class="fw-semibold mb-2"><i class="fa-solid fa-table text-primary me-1"></i>¿Qué información veo aquí?</p>
+<ul class="small text-muted ps-3">
+    <li class="mb-1"><span class="badge bg-secondary">Nombre</span> Nombre de la VIP en el momento del registro.</li>
+    <li class="mb-1"><span class="badge bg-secondary">Destination</span> Dirección IP y puerto del servicio en esa fecha.</li>
+    <li class="mb-1"><span class="badge bg-secondary">Enabled / Availability</span> Estado de la VIP en ese momento histórico.</li>
+    <li class="mb-1"><span class="badge bg-secondary">Fecha del snapshot</span> Cuándo fue tomado el registro.</li>
+</ul>
+<div class="alert alert-info py-2 small mt-2">
+    <i class="fa-solid fa-lightbulb me-1"></i>
+    Usa los filtros de nombre o IP para buscar el historial de una VIP específica y ver cómo ha cambiado su configuración con el tiempo.
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">
+            <i class="fa-solid fa-clock-rotate-left text-primary me-2"></i>VIPs Histórico
+        </h1>
+        <p class="text-muted">Total en DB: <strong>{{ total }}</strong> snapshots</p>
+    </div>
+    <div id="tableButtons"></div>
+</div>
+
+<!-- Search form -->
+<div class="card card-modern mb-3">
+    <div class="card-body py-2 d-flex align-items-end gap-3 flex-wrap">
+        <label class="fw-semibold mb-0 text-nowrap">
+            <i class="fa-solid fa-filter me-1 text-muted"></i>Búsqueda exacta:
+        </label>
+        <div>
+            <label class="form-label small mb-1 fw-semibold">Name</label>
+            <input type="text" id="fName" class="form-control form-control-sm min-w-220"
+                   placeholder="vip-000001">
+        </div>
+        <div>
+            <label class="form-label small mb-1 fw-semibold">Destination Address</label>
+            <input type="text" id="fDest" class="form-control form-control-sm min-w-160"
+                   placeholder="10.20.0.1">
+        </div>
+        <div>
+            <label class="form-label small mb-1 fw-semibold">LTM / Par HA</label>
+            <select id="fLtm" class="form-select form-select-sm min-w-200">
+                <option value="">— Todos —</option>
+                {% for grp in device_groups %}
+                <option value="{{ grp.value }}">{{ grp.label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="d-flex gap-2 align-items-end pb-1px">
+            <button id="searchBtn" class="btn btn-primary btn-sm">
+                <i class="fa-solid fa-search me-1"></i>Buscar
+            </button>
+            <button id="clearBtn" class="btn btn-outline-secondary btn-sm">
+                <i class="fa-solid fa-xmark me-1"></i>Limpiar
+            </button>
+        </div>
+    </div>
+</div>
+
+<div id="tableWrapper" class="card card-modern d-none">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table id="dataTable" class="table table-hover datatable mb-0">
+                <thead>
+                    <tr>
+                        <th>ID</th>                   <!-- 0  hidden -->
+                        <th>Name</th>                 <!-- 1  -->
+                        <th>Full Path</th>            <!-- 2  hidden by default -->
+                        <th>Dest Address</th>         <!-- 3  -->
+                        <th>Port</th>                 <!-- 4  -->
+                        <th>Destination</th>          <!-- 5  hidden by default -->
+                        <th>Protocol</th>             <!-- 6  -->
+                        <th>Type</th>                 <!-- 7  hidden by default -->
+                        <th>Enabled</th>              <!-- 8  -->
+                        <th>Default Pool</th>         <!-- 9  -->
+                        <th>SNAT Type</th>            <!-- 10 hidden by default -->
+                        <th>SNAT Pool</th>            <!-- 11 hidden by default -->
+                        <th>Source Address</th>       <!-- 12 hidden by default -->
+                        <th>Conn. Limit</th>          <!-- 13 hidden by default -->
+                        <th>Persistence Profile</th>  <!-- 14 hidden by default -->
+                        <th>Profiles</th>             <!-- 15 hidden by default -->
+                        <th>Policies</th>             <!-- 16 hidden by default -->
+                        <th>Description</th>          <!-- 17 hidden by default -->
+                        <th>LTM FQDN</th>             <!-- 18 -->
+                        <th>Date</th>                 <!-- 19 -->
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div id="emptyState" class="card card-modern">
+    <div class="card-body text-center py-5 text-muted">
+        <i class="fa-solid fa-clock-rotate-left fa-2x mb-3 d-block text-secondary"></i>
+        Ingresa al menos un criterio de búsqueda (coincidencia exacta) para ver los registros históricos.
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ csp_nonce }}">
+const HA_MAP = {{ ha_map_json|safe }};
+$(document).ready(function () {
+    const ENABLED_MAP = {
+        'yes':      '<span class="badge bg-success">yes</span>',
+        'enabled':  '<span class="badge bg-success">enabled</span>',
+        'no':       '<span class="badge bg-danger">no</span>',
+        'disabled': '<span class="badge bg-danger">disabled</span>',
+    };
+
+    var table = initDataTable('#dataTable', {
+        serverSide: true,
+        processing: true,
+        ajax: {
+            url: '{% url "lb_vip_historical_data" %}',
+            type: 'GET',
+            data: function (d) {
+                d.f_name = $('#fName').val().trim();
+                d.f_dest = $('#fDest').val().trim();
+                d.f_ltm  = $('#fLtm').val().trim();
+            },
+        },
+        columns: [
+            { data: 0  },                                                                                                                             // 0  id
+            { data: 1  },                                                                                                                             // 1  name
+            { data: 2,  render: v => v !== '-' ? `<span class="text-truncate d-inline-block mw-180" title="${v}">${v}</span>` : '-' }, // 2  full_path
+            { data: 3  },                                                                                                                             // 3  destination_address
+            { data: 4  },                                                                                                                             // 4  destination_port
+            { data: 5,  render: v => v !== '-' ? `<code class="small">${v}</code>` : '-' },                                                          // 5  destination
+            { data: 6,  render: v => v !== '-' ? `<span class="badge bg-secondary">${v}</span>` : '-' },                                             // 6  protocol
+            { data: 7,  render: v => v !== '-' ? `<span class="badge bg-light text-dark border">${v}</span>` : '-' },                                // 7  type
+            { data: 8,  render: v => ENABLED_MAP[String(v).toLowerCase()] ?? `<span class="badge bg-secondary">${v}</span>` },                       // 8  enabled
+            { data: 9,  render: v => v !== '-' ? `<span class="text-truncate d-inline-block mw-180" title="${v}">${v}</span>` : '-' }, // 9  default_pool
+            { data: 10 },                                                                                                                             // 10 snat_type
+            { data: 11 },                                                                                                                             // 11 snat_pool
+            { data: 12 },                                                                                                                             // 12 source_address
+            { data: 13 },                                                                                                                             // 13 connection_limit
+            { data: 14, render: v => v !== '-' ? `<span class="text-truncate d-inline-block mw-160" title="${v}">${v}</span>` : '-' }, // 14 persistence_profile
+            { data: 15, render: v => v !== '-' ? `<small class="text-muted">${v}</small>` : '-' },                                                   // 15 profiles
+            { data: 16 },                                                                                                                             // 16 policies
+            { data: 17, render: v => v !== '-' ? `<span class="text-truncate d-inline-block mw-160" title="${v}">${v}</span>` : '-' }, // 17 description
+            { data: 18, render: v => v !== '-' ? `<span class="text-truncate d-inline-block mw-160" title="${v}">${v}</span>` : '-' }, // 18 ltm_fqdn
+            { data: 19 },                                                                                                                             // 19 date
+        ],
+        columnDefs: [
+            { targets: [0],                                   visible: false },  // id always hidden
+            { targets: [2, 5, 7, 10, 11, 12, 13, 14, 15, 16, 17], visible: false },  // hidden by default, toggleable via ColVis
+        ],
+        dom: 'Blfrtip',
+        buttons: [
+            {
+                extend: 'colvis',
+                text: '<i class="fa-solid fa-eye me-1"></i>Columns',
+                className: 'btn btn-sm btn-outline-secondary',
+                columns: ':not(:first-child)',  // exclude hidden ID column
+            },
+            { extend: 'excel', text: '<i class="fa-solid fa-file-excel me-1"></i>Excel', className: 'btn btn-sm btn-outline-success', exportOptions: { columns: ':visible' } },
+            { extend: 'csv',   text: '<i class="fa-solid fa-file-csv me-1"></i>CSV',   className: 'btn btn-sm btn-outline-secondary', exportOptions: { columns: ':visible' } },
+        ],
+        order: [[19, 'desc']],
+        pageLength: 50,
+        deferLoading: 0,
+    });
+
+    // Move the DataTables buttons toolbar to the page header
+    table.buttons().container().appendTo('#tableButtons');
+
+    function runSearch() {
+        var hasFilter = $('#fName').val().trim() || $('#fDest').val().trim() || $('#fLtm').val().trim();
+        if (!hasFilter) return;
+        $('#emptyState').hide();
+        $('#tableWrapper').removeClass('d-none');
+        table.ajax.reload();
+    }
+
+    $('#searchBtn').on('click', runSearch);
+
+    $('#fName, #fDest, #fLtm').on('keydown', function (e) {
+        if (e.key === 'Enter') runSearch();
+    });
+
+    $('#clearBtn').on('click', function () {
+        $('#fName, #fDest, #fLtm').val('');
+        $('#tableWrapper').addClass('d-none');
+        $('#emptyState').show();
+    });
+});
+</script>
+{% endblock %}
