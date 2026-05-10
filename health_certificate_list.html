@@ -1,0 +1,196 @@
+{% extends 'base.html' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item active">Certificate Health Checks</li>
+{% endblock %}
+
+{% block page_help %}
+<p class="text-muted small mb-3">
+    <i class="fa-solid fa-shield-halved text-primary me-1"></i>
+    <strong>Revisiones de Salud de Certificados</strong> — Resultados de las verificaciones periódicas de certificados SSL/TLS en los dispositivos de red.
+</p>
+<hr class="my-3">
+<p class="fw-semibold mb-2"><i class="fa-solid fa-table text-primary me-1"></i>¿Qué información veo aquí?</p>
+<ul class="small text-muted ps-3">
+    <li class="mb-1"><span class="badge bg-secondary">Device</span> Nombre del dispositivo donde reside el certificado.</li>
+    <li class="mb-1"><span class="badge bg-secondary">Expiration Date</span> Fecha de vencimiento del certificado.</li>
+    <li class="mb-1"><span class="badge bg-secondary">Days Remaining</span> Días que faltan para el vencimiento. <span class="badge bg-danger">Rojo</span> &lt;30, <span class="badge bg-warning text-dark">Amarillo</span> &lt;60, <span class="badge bg-success">Verde</span> ≥60.</li>
+    <li class="mb-1"><span class="badge bg-secondary">Type</span> Tipo de certificado (server, CA, etc.).</li>
+    <li class="mb-1"><span class="badge bg-secondary">Alternames</span> Subject Alternative Names (SANs) del certificado.</li>
+</ul>
+<div class="alert alert-info py-2 small mt-2">
+    <i class="fa-solid fa-lightbulb me-1"></i>
+    Usa el filtro <em>Days Max</em> para ver solo los certificados que vencen en los próximos N días (ej. 30, 60, 90).
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">
+            <i class="fa-solid fa-shield-halved text-primary me-2"></i>Certificate Health Checks
+        </h1>
+        {% if filter_applied %}<p class="text-muted">Total: <strong>{{ objects|length }}</strong> records</p>{% endif %}
+    </div>
+</div>
+
+<!-- Filter card -->
+<div class="card card-modern mb-4">
+    <div class="card-header-modern">
+        <h5 class="card-title-modern">
+            <i class="fa-solid fa-filter me-2"></i>Filtros
+        </h5>
+        {% if filter_applied %}
+        <a href="{% url 'health_certificate_list' %}" class="btn btn-sm btn-outline-secondary">
+            <i class="fa-solid fa-xmark me-1"></i>Limpiar filtros
+        </a>
+        {% endif %}
+    </div>
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-2">
+                <label class="form-label fw-semibold small">Fecha desde</label>
+                <input type="date" name="fecha_desde" value="{{ fecha_desde }}" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-semibold small">Fecha hasta</label>
+                <input type="date" name="fecha_hasta" value="{{ fecha_hasta }}" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold small">Device (FQDN)</label>
+                <input type="text" name="fqdn" value="{{ fqdn }}" class="form-control form-control-sm" placeholder="Buscar por dispositivo...">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-semibold small">Days Max</label>
+                <input type="number" name="days_max" value="{{ days_max }}" class="form-control form-control-sm" placeholder="Ej. 30, 60, 90" min="0">
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary btn-sm w-100">
+                    <i class="fa-solid fa-search me-1"></i>Buscar
+                </button>
+            </div>
+        </form>
+        {% if fechas_disponibles %}
+        <div class="mt-3">
+            <span class="small text-muted fw-semibold me-2">Fechas disponibles:</span>
+            {% for fecha in fechas_disponibles %}
+            <a href="?fecha_desde={{ fecha }}&fecha_hasta={{ fecha }}"
+               class="badge me-1 mb-1 text-decoration-none cursor-pointer {% if fecha == fecha_desde %}bg-primary{% else %}bg-light text-dark border{% endif %}">
+                {{ fecha }}
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if filter_applied %}
+<div class="card card-modern">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table id="dataTable" class="table table-hover datatable mb-0">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Device</th>
+                        <th>Expiration Date</th>
+                        <th>Days Remaining</th>
+                        <th>Type</th>
+                        <th>Comments</th>
+                        <th>Alternames</th>
+                        <th>Date</th>
+                        <th>Company</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for obj in objects %}
+                    <tr>
+                        <td>{{ obj.id }}</td>
+                        <td>{{ obj.device|default:"-" }}</td>
+                        <td>{{ obj.expiration_date|default:"-" }}</td>
+                        <td>
+                            {% if obj.days_remaining is not None %}
+                                {% if obj.days_remaining < 30 %}
+                                    <span class="badge bg-danger">{{ obj.days_remaining }}</span>
+                                {% elif obj.days_remaining < 60 %}
+                                    <span class="badge bg-warning text-dark">{{ obj.days_remaining }}</span>
+                                {% else %}
+                                    <span class="badge bg-success">{{ obj.days_remaining }}</span>
+                                {% endif %}
+                            {% else %}-{% endif %}
+                        </td>
+                        <td>{{ obj.certificate_type|default:"-" }}</td>
+                        <td>
+                            {% if obj.comments %}
+                                <span title="{{ obj.comments }}" class="cursor-help">{{ obj.comments|truncatechars:50 }}</span>
+                            {% else %}-{% endif %}
+                        </td>
+                        <td>
+                            {% if obj.alternames %}
+                                <span title="{{ obj.alternames }}" class="cursor-help">{{ obj.alternames|truncatechars:60 }}</span>
+                            {% else %}-{% endif %}
+                        </td>
+                        <td>{{ obj.fecha|default:"-" }}</td>
+                        <td>{{ obj.company|default:"-" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="card card-modern">
+    <div class="card-body text-center py-5 text-muted">
+        <i class="fa-solid fa-filter fa-2x mb-3 d-block"></i>
+        Aplica un filtro para ver los resultados
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if filter_applied %}
+<script nonce="{{ csp_nonce }}">
+$(document).ready(function() {
+    var exportOpts = {
+        columns: ':visible',
+        format: {
+            body: function(data, row, col, node) {
+                var str = String(data);
+                // Comments / Alternames: texto completo en el atributo title del span
+                if (str.indexOf('cursor-help') !== -1) {
+                    var t = str.match(/title="([^"]+)"/);
+                    return t ? t[1] : $('<div>').html(data).text().trim() || '-';
+                }
+                // Badges (Days Remaining) y otros HTML → strip tags
+                return $('<div>').html(data).text().trim() || data;
+            }
+        }
+    };
+    initDataTable('#dataTable', {
+        buttons: [
+            {
+                extend: 'csvHtml5',
+                text: '<i class="fa-solid fa-file-csv me-1"></i> CSV',
+                className: 'btn btn-outline-secondary btn-sm',
+                exportOptions: exportOpts,
+            },
+            {
+                extend: 'excelHtml5',
+                text: '<i class="fa-solid fa-file-excel me-1"></i> Excel',
+                className: 'btn btn-outline-success btn-sm',
+                exportOptions: exportOpts,
+            },
+            {
+                extend: 'print',
+                text: '<i class="fa-solid fa-print me-1"></i> Print',
+                className: 'btn btn-outline-primary btn-sm',
+                exportOptions: exportOpts,
+            },
+        ],
+    });
+});
+</script>
+{% endif %}
+{% endblock %}
