@@ -1,0 +1,295 @@
+{% extends 'base.html' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'lb_physical_list' %}">Infrastructure</a></li>
+<li class="breadcrumb-item active">EoL Timeline</li>
+{% endblock %}
+
+{% block page_help %}
+<p class="text-muted small mb-3">
+    <i class="fa-solid fa-calendar-xmark text-primary me-1"></i>
+    <strong>EoL Timeline</strong> — Equipos cuyas versiones de software o modelos de hardware
+    alcanzan su fin de vida dentro del horizonte seleccionado.
+</p>
+<hr class="my-3">
+<p class="fw-semibold mb-2"><i class="fa-solid fa-circle-info text-primary me-1"></i>Tipos de evento</p>
+<ul class="small text-muted ps-3 mb-3">
+    <li class="mb-1"><span class="badge bg-warning text-dark">EoSD</span> End of Software Development — F5 deja de publicar parches para esa versión.</li>
+    <li class="mb-1"><span class="badge bg-danger">EoTS</span> End of Technical Support — F5 deja de ofrecer soporte técnico.</li>
+    <li class="mb-1"><span class="badge bg-primary">EoSS</span> End of Software Support — F5 deja de publicar software para ese hardware.</li>
+    <li class="mb-1"><span class="badge bg-secondary">TBD</span> El vendor aún no ha publicado la fecha de fin de vida de ese hardware.</li>
+</ul>
+<p class="fw-semibold mb-2"><i class="fa-solid fa-palette text-primary me-1"></i>Color por urgencia</p>
+<ul class="small text-muted ps-3">
+    <li class="mb-1"><span class="badge bg-danger">≤ 90 días</span> Acción urgente requerida.</li>
+    <li class="mb-1"><span class="badge bg-warning text-dark">91 – 180 días</span> Planificar actualización.</li>
+    <li class="mb-1"><span class="badge bg-success">› 180 días</span> En horizonte — monitorear.</li>
+</ul>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">
+            <i class="fa-solid fa-calendar-xmark text-primary me-2"></i>EoL Timeline
+        </h1>
+        <p class="text-muted">
+            {{ total }} evento{{ total|pluralize:"s" }} en los próximos {{ months }} meses
+            (hasta {{ cutoff }})
+        </p>
+    </div>
+</div>
+
+<!-- Filtros -->
+<form id="filterForm" method="get" class="mb-3 d-flex align-items-center gap-3 flex-wrap">
+    <div class="d-flex align-items-center gap-2">
+        <label class="form-label mb-0 text-muted small fw-semibold text-nowrap">
+            <i class="fa-solid fa-clock me-1"></i>Horizonte
+        </label>
+        <select id="filterMonths" name="months" class="form-select form-select-sm min-w-120">
+            <option value="12" {% if months == 12 %}selected{% endif %}>12 meses</option>
+            <option value="24" {% if months == 24 %}selected{% endif %}>24 meses</option>
+            <option value="36" {% if months == 36 %}selected{% endif %}>36 meses</option>
+        </select>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <label class="form-label mb-0 text-muted small fw-semibold text-nowrap">
+            <i class="fa-solid fa-building me-1"></i>Company
+        </label>
+        <select id="filterCompany" name="company" class="form-select form-select-sm min-w-160">
+            <option value="">— Todas —</option>
+            {% for co in companies %}
+            <option value="{{ co.client_code }}" {% if request.GET.company == co.client_code %}selected{% endif %}>
+                {{ co.name }} — {{ co.client_code }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <label class="form-label mb-0 text-muted small fw-semibold text-nowrap">
+            <i class="fa-solid fa-layer-group me-1"></i>Environment
+        </label>
+        <select id="filterEnvironment" name="environment" class="form-select form-select-sm min-w-160">
+            <option value="">— Todos —</option>
+            <option value="PRODUCTION"    {% if request.GET.environment == 'PRODUCTION'    %}selected{% endif %}>PRODUCTION</option>
+            <option value="DRP"           {% if request.GET.environment == 'DRP'           %}selected{% endif %}>DRP</option>
+            <option value="PRE-PRODUCTION"{% if request.GET.environment == 'PRE-PRODUCTION'%}selected{% endif %}>PRE-PRODUCTION</option>
+        </select>
+    </div>
+    {% if request.GET.company or request.GET.environment or months != 24 %}
+    <a href="{% url 'eol_timeline' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="fa-solid fa-filter-circle-xmark me-1"></i>Limpiar
+    </a>
+    {% endif %}
+    <a href="{% url 'eol_charts' %}{% if request.GET.company or request.GET.environment %}?{% if request.GET.company %}company={{ request.GET.company }}{% endif %}{% if request.GET.company and request.GET.environment %}&{% endif %}{% if request.GET.environment %}environment={{ request.GET.environment }}{% endif %}{% endif %}"
+       class="btn btn-outline-primary btn-sm ms-auto">
+        <i class="fa-solid fa-chart-gantt me-1"></i>Ver gráficas
+    </a>
+</form>
+
+<!-- Tabla -->
+<div class="card card-modern">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table id="dataTable" class="table table-hover datatable mb-0">
+                <thead>
+                    <tr>
+                        <th>Company</th>
+                        <th>Device</th>
+                        <th>Tipo</th>
+                        <th>Environment</th>
+                        <th>Categoría</th>
+                        <th>Versión / Modelo</th>
+                        <th>Evento</th>
+                        <th class="text-center">Fecha</th>
+                        <th class="text-center">Días restantes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in rows %}
+                    <tr>
+                        <td>
+                            <span class="badge bg-secondary">{{ r.company_code }}</span>
+                            <span class="small text-muted ms-1">{{ r.company_name }}</span>
+                        </td>
+                        <td class="fw-semibold text-nowrap">{{ r.device }}</td>
+                        <td>
+                            {% if r.tipo == 'Physical' %}
+                                <span class="badge bg-primary">Physical</span>
+                            {% else %}
+                                <span class="badge bg-info text-dark">Guest</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if r.environment == 'PRODUCTION' %}
+                                <span class="badge bg-danger">PROD</span>
+                            {% elif r.environment == 'DRP' %}
+                                <span class="badge bg-secondary">DRP</span>
+                            {% elif r.environment and r.environment != '-' %}
+                                <span class="badge bg-warning text-dark">PRE</span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if r.category == 'Software' %}
+                                <span class="badge bg-primary"><i class="fa-solid fa-code me-1"></i>Software</span>
+                            {% else %}
+                                <span class="badge bg-dark"><i class="fa-solid fa-microchip me-1"></i>Hardware</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-nowrap fw-semibold">{{ r.ref }}</td>
+                        <td>
+                            {% if r.event == 'EoSD' %}
+                                <span class="badge bg-warning text-dark">EoSD</span>
+                            {% elif r.event == 'EoSS' %}
+                                <span class="badge bg-primary">EoSS</span>
+                            {% else %}
+                                <span class="badge bg-danger">EoTS</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center text-nowrap">
+                            <span class="badge bg-{{ r.urgency }}{% if r.urgency == 'warning' %} text-dark{% endif %}">
+                                {{ r.event_date }}
+                            </span>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-{{ r.urgency }}{% if r.urgency == 'warning' %} text-dark{% endif %}">
+                                {% if r.days < 0 %}
+                                    Vencido hace {{ r.days|stringformat:"d"|slice:"1:" }} días
+                                {% else %}
+                                    {{ r.days }} días
+                                {% endif %}
+                            </span>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="9" class="text-center text-muted py-5">
+                            <i class="fa-solid fa-circle-check fa-2x text-success mb-3 d-block"></i>
+                            {% if total == 0 %}
+                                No hay eventos EoSS/EoTS dentro del horizonte seleccionado.
+                                <br>
+                                <small>
+                                    Asegúrate de haber ejecutado
+                                    <code>python manage.py seed_f5_catalog</code>
+                                    y de haber ingresado fechas en el
+                                    <a href="{% url 'f5_version_list' %}">catálogo de versiones</a> y
+                                    <a href="{% url 'f5_model_list' %}">modelos</a>.
+                                </small>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+<!-- Sección Hardware TBD (sin fecha publicada) -->
+{% if tbd_rows %}
+<div class="card card-modern mt-4">
+    <div class="card-header bg-light d-flex align-items-center gap-2">
+        <i class="fa-solid fa-clock text-secondary me-1"></i>
+        <strong>Hardware sin fecha de fin de vida publicada (TBD)</strong>
+        <span class="badge bg-secondary ms-1">{{ tbd_rows|length }}</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Company</th>
+                        <th>Device</th>
+                        <th>Tipo</th>
+                        <th>Environment</th>
+                        <th>Modelo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in tbd_rows %}
+                    <tr>
+                        <td>
+                            <span class="badge bg-secondary">{{ r.company_code }}</span>
+                            <span class="small text-muted ms-1">{{ r.company_name }}</span>
+                        </td>
+                        <td class="fw-semibold text-nowrap">{{ r.device }}</td>
+                        <td>
+                            {% if r.tipo == 'Physical' %}
+                                <span class="badge bg-primary">Physical</span>
+                            {% else %}
+                                <span class="badge bg-info text-dark">Guest</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if r.environment == 'PRODUCTION' %}
+                                <span class="badge bg-danger">PROD</span>
+                            {% elif r.environment == 'DRP' %}
+                                <span class="badge bg-secondary">DRP</span>
+                            {% elif r.environment and r.environment != '-' %}
+                                <span class="badge bg-warning text-dark">PRE</span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="fw-semibold">
+                            <span class="badge bg-secondary me-1">TBD</span>{{ r.ref }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% block extra_js %}
+<script nonce="{{ csp_nonce }}">
+$(document).ready(function() {
+    // Auto-submit filters on change (sin inline event handlers — CSP compliance)
+    var filterForm = document.getElementById('filterForm');
+    ['filterMonths', 'filterCompany', 'filterEnvironment'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el && filterForm) {
+            el.addEventListener('change', function() { filterForm.submit(); });
+        }
+    });
+
+    initDataTable('#dataTable', {
+        order: [[7, 'asc'], [0, 'asc']],
+        pageLength: 50,
+        buttons: [
+            {
+                extend: 'excelHtml5',
+                text: '<i class="fa-solid fa-file-excel me-1"></i> Excel',
+                className: 'btn btn-outline-success btn-sm',
+                exportOptions: {
+                    columns: ':visible',
+                    format: {
+                        body: function(data, row, col, node) {
+                            return $('<div>').html(data).text().trim() || data;
+                        }
+                    }
+                },
+            },
+            {
+                extend: 'csvHtml5',
+                text: '<i class="fa-solid fa-file-csv me-1"></i> CSV',
+                className: 'btn btn-outline-secondary btn-sm',
+                exportOptions: {
+                    columns: ':visible',
+                    format: {
+                        body: function(data, row, col, node) {
+                            return $('<div>').html(data).text().trim() || data;
+                        }
+                    }
+                },
+            },
+        ],
+    });
+});
+</script>
+{% endblock %}

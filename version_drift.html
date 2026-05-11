@@ -1,0 +1,287 @@
+{% extends 'base.html' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'lb_physical_list' %}">Infrastructure</a></li>
+<li class="breadcrumb-item active">Version Drift</li>
+{% endblock %}
+
+{% block page_help %}
+<p class="text-muted small mb-3">
+    <i class="fa-solid fa-code-branch text-primary me-1"></i>
+    <strong>Version Drift</strong> — Ingresa un prefijo de versión estándar (ej. <code>17.5</code>)
+    para identificar qué equipos no la cumplen. El matching es por prefijo: <code>17.5</code>
+    acepta <code>17.5.1</code>, <code>17.5.2</code>, <code>17.5.1.3</code>, etc.
+</p>
+<hr class="my-3">
+<ul class="small text-muted ps-3">
+    <li class="mb-1"><span class="badge bg-success">Standard</span> La versión del equipo empieza con el prefijo indicado.</li>
+    <li class="mb-1"><span class="badge bg-danger">Drift</span> La versión del equipo no coincide con el prefijo — candidato a actualización.</li>
+    <li class="mb-1"><span class="badge bg-secondary">Sin prefijo</span> No se ha ingresado un prefijo todavía.</li>
+</ul>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">
+            <i class="fa-solid fa-code-branch text-primary me-2"></i>Version Drift
+        </h1>
+        <p class="text-muted">{{ total_devices }} dispositivo{{ total_devices|pluralize }} analizados</p>
+    </div>
+</div>
+
+<!-- Stat cards -->
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <div class="stat-card stat-card-primary">
+            <div class="stat-icon"><i class="fa-solid fa-server"></i></div>
+            <div class="stat-info">
+                <div class="stat-value">{{ total_devices }}</div>
+                <div class="stat-label">Dispositivos totales</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div id="cardOk" class="stat-card stat-card-secondary">
+            <div class="stat-icon"><i class="fa-solid fa-circle-check"></i></div>
+            <div class="stat-info">
+                <div class="stat-value" id="statOk">-</div>
+                <div class="stat-label">En versión estándar</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div id="cardDrift" class="stat-card stat-card-secondary">
+            <div class="stat-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+            <div class="stat-info">
+                <div class="stat-value" id="statDrift">-</div>
+                <div class="stat-label">Con drift detectado</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div id="cardCompanies" class="stat-card stat-card-secondary">
+            <div class="stat-icon"><i class="fa-solid fa-building"></i></div>
+            <div class="stat-info">
+                <div class="stat-value" id="statCompanies">-</div>
+                <div class="stat-label">Companies afectadas</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="mb-3 d-flex align-items-center gap-3 flex-wrap">
+    <div class="d-flex align-items-center gap-2">
+        <label for="versionPrefix" class="form-label mb-0 text-muted small fw-semibold text-nowrap">
+            <i class="fa-solid fa-code-branch me-1"></i>Versión estándar (prefijo)
+        </label>
+        <input type="text" id="versionPrefix" class="form-control form-control-sm min-w-120"
+               placeholder="ej. 17.5">
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <label for="companyFilter" class="form-label mb-0 text-muted small fw-semibold text-nowrap">
+            <i class="fa-solid fa-building me-1"></i>Company
+        </label>
+        <select id="companyFilter" class="form-select form-select-sm min-w-160">
+            <option value="">— Todas —</option>
+            {% for co in companies %}
+            <option value="{{ co.client_code }}">{{ co.name }} — {{ co.client_code }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="form-check mb-0">
+        <input class="form-check-input" type="checkbox" id="onlyDrift">
+        <label class="form-check-label small fw-semibold text-danger" for="onlyDrift">
+            Solo mostrar Drift
+        </label>
+    </div>
+</div>
+
+<!-- Tabla -->
+<div class="card card-modern">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table id="dataTable" class="table table-hover datatable mb-0">
+                <thead>
+                    <tr>
+                        <th>Company</th>
+                        <th>Device</th>
+                        <th>Tipo</th>
+                        <th>Environment</th>
+                        <th>Versión actual</th>
+                        <th class="text-center">Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in rows %}
+                    <tr data-company="{{ r.company_code }}" data-version="{{ r.version }}" data-drift="0">
+                        <td>
+                            <span class="badge bg-secondary">{{ r.company_code }}</span>
+                            <span class="small text-muted ms-1">{{ r.company_name }}</span>
+                        </td>
+                        <td class="fw-semibold text-nowrap">{{ r.device }}</td>
+                        <td>
+                            {% if r.tipo == 'Physical' %}
+                                <span class="badge bg-primary">Physical</span>
+                            {% else %}
+                                <span class="badge bg-info text-dark">Guest</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if r.environment == 'PRODUCTION' %}
+                                <span class="badge bg-danger">PROD</span>
+                            {% elif r.environment == 'DRP' %}
+                                <span class="badge bg-secondary">DRP</span>
+                            {% elif r.environment and r.environment != '-' %}
+                                <span class="badge bg-warning text-dark">PRE</span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-nowrap">{{ r.version }}</td>
+                        <td class="text-center">
+                            <span class="badge bg-secondary">
+                                <i class="fa-solid fa-minus me-1"></i>Sin prefijo
+                            </span>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-5">
+                            <i class="fa-solid fa-inbox fa-2x mb-3 d-block"></i>
+                            No hay dispositivos con versión registrada.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ csp_nonce }}">
+$(document).ready(function() {
+    var table = initDataTable('#dataTable', {
+        order: [[0, 'asc'], [1, 'asc']],
+        pageLength: 50,
+        buttons: [
+            {
+                extend: 'excelHtml5',
+                text: '<i class="fa-solid fa-file-excel me-1"></i> Excel',
+                className: 'btn btn-outline-success btn-sm',
+                exportOptions: {
+                    columns: ':visible',
+                    format: {
+                        body: function(data, row, col, node) {
+                            return $('<div>').html(data).text().trim() || data;
+                        }
+                    }
+                },
+            },
+            {
+                extend: 'csvHtml5',
+                text: '<i class="fa-solid fa-file-csv me-1"></i> CSV',
+                className: 'btn btn-outline-secondary btn-sm',
+                exportOptions: {
+                    columns: ':visible',
+                    format: {
+                        body: function(data, row, col, node) {
+                            return $('<div>').html(data).text().trim() || data;
+                        }
+                    }
+                },
+            },
+        ],
+    });
+
+    document.getElementById('versionPrefix').addEventListener('input',  applyFilters);
+    document.getElementById('companyFilter').addEventListener('change', applyFilters);
+    document.getElementById('onlyDrift').addEventListener('change',     applyFilters);
+
+    function applyFilters() {
+        var prefix = document.getElementById('versionPrefix').value.trim().toLowerCase();
+        var co     = document.getElementById('companyFilter').value;
+        var drift  = document.getElementById('onlyDrift').checked;
+
+        // 1. Recorrer todas las filas: actualizar data-drift, badge de estado y color de versión
+        var okCount = 0, driftCount = 0, driftCompanies = new Set();
+
+        table.rows().every(function() {
+            var row     = this.node();
+            var version = (row.getAttribute('data-version') || '').toLowerCase();
+            var isDrift = prefix !== '' && !version.startsWith(prefix);
+
+            row.setAttribute('data-drift', isDrift ? '1' : '0');
+
+            var badge = row.querySelector('td:last-child .badge');
+            if (badge) {
+                if (prefix === '') {
+                    badge.className = 'badge bg-secondary';
+                    badge.innerHTML = '<i class="fa-solid fa-minus me-1"></i>Sin prefijo';
+                } else if (isDrift) {
+                    badge.className = 'badge bg-danger';
+                    badge.innerHTML = '<i class="fa-solid fa-triangle-exclamation me-1"></i>Drift';
+                } else {
+                    badge.className = 'badge bg-success';
+                    badge.innerHTML = '<i class="fa-solid fa-circle-check me-1"></i>Standard';
+                }
+            }
+
+            var vCell = row.querySelector('td:nth-child(5)');
+            if (vCell) {
+                if (isDrift && prefix !== '') {
+                    vCell.classList.add('text-danger', 'fw-semibold');
+                } else {
+                    vCell.classList.remove('text-danger', 'fw-semibold');
+                }
+            }
+
+            if (prefix !== '') {
+                if (isDrift) { driftCount++; driftCompanies.add(row.getAttribute('data-company')); }
+                else         { okCount++; }
+            }
+        });
+
+        // 2. Actualizar stat cards
+        document.getElementById('statOk').textContent        = prefix ? okCount             : '-';
+        document.getElementById('statDrift').textContent     = prefix ? driftCount          : '-';
+        document.getElementById('statCompanies').textContent = prefix ? driftCompanies.size : '-';
+
+        var okCard = document.getElementById('cardOk');
+        if (okCard) {
+            okCard.className = 'stat-card ' + (!prefix ? 'stat-card-secondary' : 'stat-card-success');
+        }
+        var driftCard = document.getElementById('cardDrift');
+        if (driftCard) {
+            driftCard.className = 'stat-card ' + (
+                !prefix        ? 'stat-card-secondary' :
+                driftCount > 0 ? 'stat-card-danger'    : 'stat-card-success'
+            );
+        }
+        var compCard = document.getElementById('cardCompanies');
+        if (compCard) {
+            compCard.className = 'stat-card ' + (
+                !prefix                 ? 'stat-card-secondary' :
+                driftCompanies.size > 0 ? 'stat-card-warning'   : 'stat-card-success'
+            );
+        }
+
+        // 3. Aplicar filtros de tabla
+        $.fn.dataTable.ext.search.length = 0;
+        $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
+            var row = table.row(dataIndex).node();
+            if (!row) return true;
+            var rowCo    = row.getAttribute('data-company') || '';
+            var rowDrift = row.getAttribute('data-drift') === '1';
+            if (co && rowCo !== co)  return false;
+            if (drift && !rowDrift)  return false;
+            return true;
+        });
+        table.draw();
+    }
+});
+</script>
+{% endblock %}
