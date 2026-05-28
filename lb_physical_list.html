@@ -1,0 +1,218 @@
+{% extends 'base.html' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item active">Physical LBs</li>
+{% endblock %}
+
+{% block page_help %}
+<p class="text-muted small mb-3">
+    <i class="fa-solid fa-hdd text-primary me-1"></i>
+    <strong>Balanceadores Físicos</strong> — Inventario de los equipos de hardware (servidores físicos) que funcionan como balanceadores de carga en la infraestructura.
+</p>
+<hr class="my-3">
+<p class="fw-semibold mb-2"><i class="fa-solid fa-table text-primary me-1"></i>¿Qué información veo aquí?</p>
+<ul class="small text-muted ps-3">
+    <li class="mb-1"><span class="badge bg-secondary">Device</span> Nombre del equipo balanceador físico.</li>
+    <li class="mb-1"><span class="badge bg-secondary">Mgmt IP</span> Dirección IP de administración del equipo (para acceso de gestión).</li>
+    <li class="mb-1"><span class="badge bg-secondary">Model</span> Modelo de hardware del equipo.</li>
+    <li class="mb-1"><span class="badge bg-secondary">Version</span> Versión del sistema operativo instalado en el equipo.</li>
+    <li class="mb-1"><span class="badge bg-secondary">Env</span> Ambiente al que pertenece: producción, desarrollo, pruebas, etc.</li>
+    <li class="mb-1"><span class="badge bg-secondary">Service / Company</span> Empresa o servicio al que está asignado el equipo.</li>
+</ul>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">
+            <i class="fa-solid fa-hdd text-primary me-2"></i>Physical Load Balancers
+        </h1>
+        <p class="text-muted">Total: <strong>{{ objects|length }}</strong> records</p>
+    </div>
+    <a href="{% url 'lb_physical_add' %}" class="btn btn-primary">
+        <i class="fa-solid fa-plus me-1"></i> Add Physical LB
+    </a>
+</div>
+
+<div class="mb-3">
+    <form method="get" id="companyFilterForm" class="d-flex align-items-center gap-2">
+        {% if environment %}<input type="hidden" name="environment" value="{{ environment }}">{% endif %}
+        <label for="companySelect" class="form-label mb-0 text-muted small fw-semibold text-nowrap">
+            <i class="fa-solid fa-building me-1"></i>Company
+        </label>
+        <select name="company" id="companySelect" class="form-select form-select-sm min-w-160">
+            <option value="">— Todas —</option>
+            {% for co in companies %}
+            <option value="{{ co.client_code }}" {% if co.client_code == company_filter %}selected{% endif %}>{{ co.name }} — {{ co.client_code }}</option>
+            {% endfor %}
+        </select>
+    </form>
+</div>
+
+<div class="card card-modern">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table id="dataTable" class="table table-hover table-sm datatable mb-0 small">
+                <thead>
+                    <tr>
+                        <th>Device</th>
+                        <th>CI ID</th>
+                        <th>Mgmt IP</th>
+                        <th>Version</th>
+                        <th>Distro</th>
+                        <th>Model</th>
+                        <th>Serial</th>
+                        <th>Snow</th>
+                        <th>Env</th>
+                        <th>Service</th>
+                        <th>Vendor Support</th>
+                        <th>Location</th>
+                        <th>Ansible Group</th>
+                        <th>Company</th>
+                        <th>Datacenter</th>
+                        <th>Purpose</th>
+                        <th>Monitoreo</th>
+                        <th>CyberArk</th>
+                        <th>User CyberArk</th>
+                        <th>CMDB-SNMP</th>
+                        <th>URL CyberArk</th>
+                        <th>Last Modified</th>
+                        <th class="text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for obj in objects %}
+                    <tr>
+                        <td class="text-nowrap"><strong>{{ obj.device }}</strong></td>
+                        <td class="text-nowrap">{{ obj.ci_id|default:"-" }}</td>
+                        <td class="text-nowrap"><code>{{ obj.mgmt_ip|default:"-" }}</code></td>
+                        <td class="text-nowrap">{{ obj.version|default:"-" }}</td>
+                        <td class="text-nowrap">{{ obj.distro|default:"-" }}</td>
+                        <td class="text-nowrap">{{ obj.model|default:"-" }}</td>
+                        <td class="text-nowrap">{{ obj.serial|default:"-" }}</td>
+                        <td class="text-center">
+                            {% if obj.snow_link %}
+                                <a href="{{ obj.snow_link }}" target="_blank" rel="noopener noreferrer" title="{{ obj.snow_link }}">
+                                    <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                                </a>
+                            {% else %}-{% endif %}
+                        </td>
+                        <td>
+                            {% if obj.environment %}
+                                {% if obj.environment == 'PRODUCTION' %}
+                                    <span class="badge bg-success">PROD</span>
+                                {% elif obj.environment == 'DRP' %}
+                                    <span class="badge bg-danger">DRP</span>
+                                {% else %}
+                                    <span class="badge bg-warning text-dark">PRE</span>
+                                {% endif %}
+                            {% else %}-{% endif %}
+                        </td>
+                        <td class="text-nowrap">{{ obj.service|default:"-" }}</td>
+                        <td class="text-nowrap">{{ obj.vendor_support|default:"-" }}</td>
+                        <td class="text-nowrap">{{ obj.location|default:"-" }}</td>
+                        <td>
+                            {% if obj.ansible_group %}
+                                <span title="{{ obj.ansible_group }}" class="cursor-help text-nowrap">
+                                    {{ obj.ansible_group|truncatechars:20 }}
+                                </span>
+                            {% else %}-{% endif %}
+                        </td>
+                        <td class="text-nowrap">{{ obj.company|default:"-" }}</td>
+                        <td class="text-nowrap">{{ obj.datacenter|default:"-" }}</td>
+                        <td class="text-nowrap">{{ obj.purpose|default:"-" }}</td>
+                        <td class="text-center">{% include 'lb_manager/_boolean_icon.html' with value=obj.monitoreo %}</td>
+                        <td class="text-center">{% include 'lb_manager/_boolean_icon.html' with value=obj.cyberark %}</td>
+                        <td class="text-nowrap">{{ obj.user_cyberark|default:"-" }}</td>
+                        <td class="text-center">{% include 'lb_manager/_boolean_icon.html' with value=obj.cmdb_snmp %}</td>
+                        <td class="text-nowrap">
+                            {% if obj.url_cyberark %}
+                                <a href="{{ obj.url_cyberark }}" target="_blank" rel="noopener noreferrer" title="{{ obj.url_cyberark }}">
+                                    <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                                </a>
+                            {% else %}-{% endif %}
+                        </td>
+                        <td class="text-nowrap">{{ obj.last_modified|date:"Y-m-d H:i" }}</td>
+                        <td class="text-center text-nowrap">
+                            <a href="{% url 'lb_physical_edit' obj.device %}" class="btn btn-sm btn-outline-primary me-1" title="Edit">
+                                <i class="fa-solid fa-pen"></i>
+                            </a>
+                            <a href="{% url 'lb_physical_delete' obj.device %}" class="btn btn-sm btn-outline-danger" title="Delete">
+                                <i class="fa-solid fa-trash"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ csp_nonce }}">
+$(document).ready(function() {
+    var now = new Date();
+    var pad = function(n) { return n < 10 ? '0' + n : n; };
+    var dateStr = now.getFullYear() + '' + pad(now.getMonth()+1) + '' + pad(now.getDate()) +
+                  '_' + pad(now.getHours()) + '' + pad(now.getMinutes());
+    var filename = 'physical_lb_' + dateStr;
+
+    var hiddenCols = [12, 20, 21];  // Ansible Group, URL CyberArk, Last Modified
+    $('#dataTable').DataTable({
+        pageLength: 25,
+        lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
+        dom: '<"row align-items-center mb-3"<"col-sm-6"l><"col-sm-6 text-end"B>>' +
+             '<"row"<"col-12"f>>' +
+             '<"row"<"col-12"tr>>' +
+             '<"row mt-3 align-items-center"<"col-sm-5"i><"col-sm-7"p>>',
+        buttons: [
+            {
+                extend: 'colvis',
+                text: '<i class="fa-solid fa-eye me-1"></i> Columns',
+                className: 'btn btn-outline-secondary btn-sm',
+                columns: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21],
+            },
+            {
+                extend: 'csvHtml5',
+                text: '<i class="fa-solid fa-file-csv me-1"></i> CSV',
+                className: 'btn btn-outline-secondary btn-sm',
+                filename: filename,
+                exportOptions: { columns: ':not(:last-child)' }
+            },
+            {
+                extend: 'excelHtml5',
+                text: '<i class="fa-solid fa-file-excel me-1"></i> Excel',
+                className: 'btn btn-outline-success btn-sm',
+                filename: filename,
+                exportOptions: { columns: ':not(:last-child)' }
+            },
+            {
+                extend: 'print',
+                text: '<i class="fa-solid fa-print me-1"></i> Print',
+                className: 'btn btn-outline-primary btn-sm',
+                exportOptions: { columns: ':not(:last-child)' }
+            }
+        ],
+        columnDefs: [
+            { targets: hiddenCols, visible: false },
+            { targets: -1, orderable: false }
+        ],
+        responsive: false,
+        language: {
+            search: '',
+            searchPlaceholder: 'Search records...',
+            lengthMenu: 'Show _MENU_ entries',
+            info: 'Showing _START_ to _END_ of _TOTAL_ records',
+            emptyTable: 'No data available',
+            zeroRecords: 'No matching records found'
+        },
+        order: []
+    });
+});
+document.getElementById('companySelect').addEventListener('change', function() {
+    document.getElementById('companyFilterForm').submit();
+});
+</script>
+{% endblock %}

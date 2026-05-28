@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'node_list' %}">LTM Nodes</a></li>
+<li class="breadcrumb-item active">Unassigned</li>
+{% endblock %}
+
+{% block page_help %}
+<p class="text-muted small mb-3">
+    <i class="fa-solid fa-circle-exclamation text-warning me-1"></i>
+    <strong>Nodos Sin Asignar</strong> — Servidores que están registrados en el balanceador pero que no pertenecen a ningún pool. Al no estar en un pool, no reciben tráfico de ningún servicio.
+</p>
+<hr class="my-3">
+<p class="fw-semibold mb-2"><i class="fa-solid fa-table text-primary me-1"></i>¿Qué información veo aquí?</p>
+<ul class="small text-muted ps-3">
+    <li class="mb-1"><span class="badge bg-secondary">Nombre</span> Identificador del nodo (servidor) sin asignar.</li>
+    <li class="mb-1"><span class="badge bg-secondary">Address</span> Dirección IP del servidor.</li>
+    <li class="mb-1"><span class="badge bg-secondary">Availability</span> Estado de salud del servidor según los monitores del balanceador.</li>
+    <li class="mb-1"><span class="badge bg-secondary">LTM FQDN</span> Equipo balanceador donde está registrado el nodo.</li>
+</ul>
+<div class="alert alert-warning py-2 small mt-2">
+    <i class="fa-solid fa-triangle-exclamation me-1"></i>
+    Un nodo sin asignar a ningún pool no aporta tráfico y puede ser candidato para limpieza de la configuración.
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">
+            <i class="fa-solid fa-circle-exclamation text-warning me-2"></i>Unassigned Nodes
+        </h1>
+        <p class="text-muted">Nodes not assigned to any pool &mdash; Total: <strong>{{ total }}</strong></p>
+    </div>
+</div>
+
+<!-- LTM FQDN filter -->
+<div class="card card-modern mb-3">
+    <div class="card-body py-2 d-flex align-items-center gap-3 flex-wrap">
+        <label for="ltmFilter" class="fw-semibold mb-0 text-nowrap">
+            <i class="fa-solid fa-filter me-1 text-muted"></i>Filter by LTM:
+        </label>
+        <select id="ltmFilter" class="form-select form-select-sm mw-320">
+            <option value="">— All LTMs —</option>
+            {% for fqdn in ltm_fqdns %}
+            <option value="{{ fqdn }}">{{ fqdn }}</option>
+            {% endfor %}
+        </select>
+    </div>
+</div>
+
+<div class="card card-modern">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table id="dataTable" class="table table-hover datatable mb-0">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>LTM FQDN</th>
+                        <th>Name</th>
+                        <th>Address</th>
+                        <th>Availability</th>
+                        <th>Enabled</th>
+                        <th>Monitor Status</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ csp_nonce }}">
+$(document).ready(function () {
+    const AVAIL_MAP = {
+        'available': 'bg-success',
+        'offline':   'bg-danger',
+        'unknown':   'bg-secondary',
+    };
+    const ENABLED_MAP = {
+        'enabled':  '<span class="badge bg-success">Enabled</span>',
+        'disabled': '<span class="badge bg-danger">Disabled</span>',
+    };
+
+    var table = initDataTable('#dataTable', {
+        serverSide: true,
+        processing: true,
+        ajax: {
+            url: '{% url "unassigned_node_data" %}',
+            type: 'GET',
+            data: function (d) {
+                d.ltm_fqdn = $('#ltmFilter').val();
+            },
+        },
+        columns: [
+            { data: 0 },
+            { data: 1, render: v => v !== '-' ? `<span class="text-truncate d-inline-block mw-200" title="${v}">${v}</span>` : '-' },
+            { data: 2 },
+            { data: 3, render: v => v !== '-' ? `<code>${v}</code>` : '-' },
+            { data: 4, render: v => {
+                if (v === '-') return '-';
+                const cls = AVAIL_MAP[v] ?? 'bg-warning text-dark';
+                return `<span class="badge ${cls}">${v}</span>`;
+            }},
+            { data: 5, render: v => ENABLED_MAP[v] ?? `<span class="text-muted">${v}</span>` },
+            { data: 6 },
+        ],
+        columnDefs: [
+            { targets: [0], visible: false },
+        ],
+        order: [[2, 'asc']],
+    });
+
+    // Re-draw when the LTM filter changes
+    $('#ltmFilter').on('change', function () {
+        table.ajax.reload();
+    });
+});
+</script>
+{% endblock %}
