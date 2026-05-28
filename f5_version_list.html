@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'lb_physical_list' %}">Infrastructure</a></li>
+<li class="breadcrumb-item active">Versiones F5</li>
+{% endblock %}
+
+{% block page_help %}
+<p class="text-muted small mb-0">
+    <i class="fa-solid fa-code-fork text-primary me-1"></i>
+    Catálogo de versiones de software F5 BIG-IP con sus fechas de ciclo de vida:
+    <strong>EoSD</strong> (End of Software Development — F5 deja de publicar parches) y
+    <strong>EoTS</strong> (End of Technical Support — F5 deja de ofrecer soporte técnico).
+    Estos valores alimentan la vista <a href="{% url 'eol_timeline' %}">EoL Timeline</a>.
+</p>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">
+            <i class="fa-solid fa-code-fork text-primary me-2"></i>Versiones de Software F5
+        </h1>
+        <p class="text-muted">{{ objects|length }} versión{{ objects|length|pluralize:"es" }} registrada{{ objects|length|pluralize:"s" }}</p>
+    </div>
+    {% if perms.lb_manager.add_f5softwareversion %}
+    <div>
+        <a href="{% url 'f5_version_add' %}" class="btn btn-primary btn-sm">
+            <i class="fa-solid fa-plus me-1"></i>Agregar versión
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<div class="card card-modern">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table id="dataTable" class="table table-hover datatable mb-0">
+                <thead>
+                    <tr>
+                        <th>Versión</th>
+                        <th class="text-center">EoSD</th>
+                        <th class="text-center">EoTS</th>
+                        <th>Notas</th>
+                        <th class="text-center">Physicals</th>
+                        <th class="text-center">Guests</th>
+                        <th class="text-center no-sort">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for obj in objects %}
+                    <tr>
+                        <td class="fw-semibold">{{ obj.version }}</td>
+                        <td class="text-center text-nowrap">
+                            {% if obj.eosd_date %}
+                                <span class="badge bg-warning text-dark">{{ obj.eosd_date }}</span>
+                            {% else %}
+                                <span class="text-muted small">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center text-nowrap">
+                            {% if obj.eots_date %}
+                                <span class="badge bg-danger">{{ obj.eots_date }}</span>
+                            {% else %}
+                                <span class="text-muted small">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="small text-muted">{{ obj.notes|default:"—"|truncatechars:60 }}</td>
+                        <td class="text-center">
+                            <span class="badge bg-primary">{{ obj.lb_physicals.count }}</span>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-info text-dark">{{ obj.lb_guests.count }}</span>
+                        </td>
+                        <td class="text-center text-nowrap">
+                            {% if perms.lb_manager.change_f5softwareversion %}
+                            <a href="{% url 'f5_version_edit' obj.pk %}" class="btn btn-outline-primary btn-sm">
+                                <i class="fa-solid fa-pen-to-square"></i>
+                            </a>
+                            {% endif %}
+                            {% if perms.lb_manager.delete_f5softwareversion %}
+                            <a href="{% url 'f5_version_delete' obj.pk %}" class="btn btn-outline-danger btn-sm">
+                                <i class="fa-solid fa-trash"></i>
+                            </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-5">
+                            <i class="fa-solid fa-inbox fa-2x mb-3 d-block"></i>
+                            No hay versiones en el catálogo.
+                            Ejecuta <code>python manage.py seed_f5_catalog</code> para poblar desde datos existentes.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ csp_nonce }}">
+$(document).ready(function() {
+    initDataTable('#dataTable', {
+        order: [[0, 'asc']],
+        pageLength: 50,
+        columnDefs: [{ orderable: false, targets: -1 }],
+        buttons: [
+            {
+                extend: 'excelHtml5',
+                text: '<i class="fa-solid fa-file-excel me-1"></i> Excel',
+                className: 'btn btn-outline-success btn-sm',
+                exportOptions: { columns: [0,1,2,3,4,5] },
+            },
+            {
+                extend: 'csvHtml5',
+                text: '<i class="fa-solid fa-file-csv me-1"></i> CSV',
+                className: 'btn btn-outline-secondary btn-sm',
+                exportOptions: { columns: [0,1,2,3,4,5] },
+            },
+        ],
+    });
+});
+</script>
+{% endblock %}
