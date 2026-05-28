@@ -1,0 +1,195 @@
+f{% extends 'base.html' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item active">Hardening LB</li>
+{% endblock %}
+
+{% block page_help %}
+<p class="text-muted small mb-3">
+    <i class="fa-solid fa-shield-halved text-primary me-1"></i>
+    <strong>Hardening LB</strong> — Lista de verificaciones de seguridad realizadas sobre los equipos balanceadores. Cada registro indica si el equipo cumple o no con un estándar de seguridad específico.
+</p>
+<hr class="my-3">
+<p class="fw-semibold mb-2"><i class="fa-solid fa-table text-primary me-1"></i>¿Qué información veo aquí?</p>
+<ul class="small text-muted ps-3">
+    <li class="mb-1"><span class="badge bg-secondary">Device</span> Nombre del equipo balanceador evaluado.</li>
+    <li class="mb-1"><span class="badge bg-secondary">Code</span> Código del estándar o regla de seguridad verificada.</li>
+    <li class="mb-1"><span class="badge bg-success">Passed</span> El equipo cumple con esta verificación de seguridad.</li>
+    <li class="mb-1"><span class="badge bg-danger">Failed</span> El equipo no cumple con esta verificación; requiere atención.</li>
+    <li class="mb-1"><span class="badge bg-secondary">Fecha</span> Cuándo se realizó la revisión de seguridad.</li>
+</ul>
+<div class="alert alert-info py-2 small mt-2">
+    <i class="fa-solid fa-lightbulb me-1"></i>
+    Los registros con estado <em>Failed</em> deben ser atendidos para mantener la seguridad de la infraestructura. Consulta la <strong>Bitácora Hardening</strong> para ver los incidentes abiertos.
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">
+            <i class="fa-solid fa-shield-halved text-primary me-2"></i>Hardening / Vulnerabilidades LB
+        </h1>
+        <p class="text-muted">Total registros: <strong>{{ total }}</strong></p>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card card-modern mb-3">
+    <div class="card-body py-3">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label for="deviceFilter" class="form-label mb-1 small fw-semibold">Device</label>
+                <select id="deviceFilter" class="form-select form-select-sm">
+                    <option value="">— Todos los devices —</option>
+                    {% for d in devices %}
+                    <option value="{{ d }}">{{ d }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="codeFilter" class="form-label mb-1 small fw-semibold">Code</label>
+                <select id="codeFilter" class="form-select form-select-sm">
+                    <option value="">— Todos los codes —</option>
+                    {% for c in codes %}
+                    <option value="{{ c }}">{{ c }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="resultadoFilter" class="form-label mb-1 small fw-semibold">Resultado</label>
+                <select id="resultadoFilter" class="form-select form-select-sm">
+                    <option value="">— Todos —</option>
+                    <option value="passed">Passed</option>
+                    <option value="failed">Failed</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="dateFromFilter" class="form-label mb-1 small fw-semibold">Fecha desde</label>
+                <input type="date" id="dateFromFilter" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-2">
+                <label for="dateToFilter" class="form-label mb-1 small fw-semibold">Fecha hasta</label>
+                <input type="date" id="dateToFilter" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-2">
+                <button id="btnClearFilters" class="btn btn-outline-secondary btn-sm w-100">
+                    <i class="fa-solid fa-xmark me-1"></i>Limpiar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card card-modern">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table id="dataTable" class="table table-hover datatable mb-0">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Device</th>
+                        <th>Code</th>
+                        <th>Descripción</th>
+                        <th>Valor Obtenido</th>
+                        <th>Valor Recomendado</th>
+                        <th>Resultado</th>
+                        <th>Comando</th>
+                        <th>Fecha</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ csp_nonce }}">
+$(document).ready(function () {
+    const RESULTADO_MAP = {
+        'passed':  '<span class="badge bg-success">Passed</span>',
+        'failed':  '<span class="badge bg-danger">Failed</span>',
+        'warning': '<span class="badge bg-warning text-dark">Warning</span>',
+        'n/a':     '<span class="badge bg-secondary">N/A</span>',
+    };
+
+    const table = initDataTable('#dataTable', {
+        serverSide: true,
+        processing: true,
+        ajax: {
+            url: '{% url "lb_hardening_data" %}',
+            type: 'GET',
+            data: d => {
+                d.device      = $('#deviceFilter').val();
+                d.code        = $('#codeFilter').val();
+                d.resultado   = $('#resultadoFilter').val();
+                d.date_from   = $('#dateFromFilter').val();
+                d.date_to     = $('#dateToFilter').val();
+                return d;
+            },
+        },
+        columns: [
+            { data: 0, visible: false },                          // 0 id
+            { data: 1 },                                          // 1 device
+            { data: 2, className: 'text-nowrap' },                // 2 code
+            { data: 3 },                                          // 3 descripcion
+            { data: 4 },                                          // 4 valor_obtenido
+            { data: 5 },                                          // 5 valor_recomendado
+            {                                                     // 6 resultado
+                data: 6,
+                render: v => RESULTADO_MAP[v?.toLowerCase()] ?? `<span class="badge bg-light text-dark">${v}</span>`,
+            },
+            {                                                     // 7 comando
+                data: 7,
+                render: v => v && v !== '-'
+                    ? `<code class="small text-muted pre-wrap-break">${v}</code>`
+                    : '-',
+                orderable: false,
+            },
+            { data: 8, className: 'text-nowrap' },                // 8 fecha
+        ],
+        columnDefs: [
+            { targets: [0], visible: false },
+        ],
+        dom: 'Blfrtip',
+        buttons: [
+            {
+                extend: 'colvis',
+                text: '<i class="fa-solid fa-eye me-1"></i>Columns',
+                className: 'btn btn-sm btn-outline-secondary',
+            },
+            {
+                extend: 'excel',
+                text: '<i class="fa-solid fa-file-excel me-1"></i>Excel',
+                className: 'btn btn-sm btn-outline-success',
+                exportOptions: { columns: ':visible' },
+            },
+            {
+                extend: 'csv',
+                text: '<i class="fa-solid fa-file-csv me-1"></i>CSV',
+                className: 'btn btn-sm btn-outline-secondary',
+                exportOptions: { columns: ':visible' },
+            },
+        ],
+        order: [[8, 'desc'], [1, 'asc'], [2, 'asc']],
+        pageLength: 25,
+    });
+
+    // Reload table when filters change
+    $('#deviceFilter, #codeFilter, #resultadoFilter').on('change', function () {
+        table.ajax.reload();
+    });
+    $('#dateFromFilter, #dateToFilter').on('change', function () {
+        table.ajax.reload();
+    });
+
+    $('#btnClearFilters').on('click', function () {
+        $('#deviceFilter, #codeFilter, #resultadoFilter').val('');
+        $('#dateFromFilter, #dateToFilter').val('');
+        table.ajax.reload();
+    });
+});
+</script>
+{% endblock %}
