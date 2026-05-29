@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'lb_change_list' %}">Cambios de LB</a></li>
+<li class="breadcrumb-item active">Plantillas</li>
+{% endblock %}
+
+{% block page_help %}
+<p class="text-muted small mb-0">
+    <i class="fa-solid fa-scroll text-primary me-1"></i>
+    <strong>Plantillas de checklist</strong> — Define los ítems pre y post cambio para cada tipo de operación.
+    Usa el comando <code>seed_lb_change_templates</code> para cargar las plantillas estándar de F5.
+</p>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">
+            <i class="fa-solid fa-scroll text-primary me-2"></i>Plantillas de Checklist
+        </h1>
+        <p class="text-muted">Total: <strong>{{ objects|length }}</strong></p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'lb_change_list' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="fa-solid fa-arrow-left me-1"></i>Cambios
+        </a>
+        {% if perms.lb_manager.add_lbchangetemplate %}
+        <a href="{% url 'lb_change_template_add' %}" class="btn btn-primary btn-sm">
+            <i class="fa-solid fa-plus me-1"></i>Nueva plantilla
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+{% for obj in objects %}
+<div class="card card-modern mb-3">
+    <div class="card-header-modern d-flex align-items-center justify-content-between">
+        <div>
+            <h6 class="card-title-modern mb-0">
+                {{ obj.name }}
+                <span class="badge bg-primary-subtle text-primary-emphasis ms-2">{{ obj.get_change_type_display }}</span>
+                {% if not obj.active %}<span class="badge bg-secondary ms-1">Inactiva</span>{% endif %}
+            </h6>
+            {% if obj.description %}<p class="small text-muted mb-0 mt-1">{{ obj.description }}</p>{% endif %}
+        </div>
+        <div class="d-flex gap-2">
+            {% if perms.lb_manager.change_lbchangetemplate %}
+            <a href="{% url 'lb_change_template_items' obj.pk %}"
+               class="btn btn-sm btn-outline-secondary" title="Gestionar ítems"
+               aria-label="Ítems de {{ obj.name }}">
+                <i class="fa-solid fa-list-check"></i>
+            </a>
+            <a href="{% url 'lb_change_template_edit' obj.pk %}"
+               class="btn btn-sm btn-outline-primary" title="Editar"
+               aria-label="Editar {{ obj.name }}">
+                <i class="fa-solid fa-pen"></i>
+            </a>
+            {% endif %}
+            {% if perms.lb_manager.delete_lbchangetemplate %}
+            <a href="{% url 'lb_change_template_delete' obj.pk %}"
+               class="btn btn-sm btn-outline-danger" title="Eliminar"
+               aria-label="Eliminar {{ obj.name }}">
+                <i class="fa-solid fa-trash"></i>
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <p class="fw-semibold small text-warning mb-2">
+                    <i class="fa-solid fa-arrow-right-to-bracket me-1"></i>Pre-Cambio
+                    ({{ obj.items.all|length }} ítems)
+                </p>
+                <ol class="small text-muted ps-3 mb-0">
+                    {% for item in obj.items.all %}
+                    {% if item.phase == 'pre' %}
+                    <li class="mb-1">
+                        {{ item.text }}
+                        {% if not item.required %}<span class="badge bg-secondary-subtle text-secondary-emphasis ms-1">Opcional</span>{% endif %}
+                    </li>
+                    {% endif %}
+                    {% empty %}
+                    <li class="text-muted">Sin ítems</li>
+                    {% endfor %}
+                </ol>
+            </div>
+            <div class="col-md-6">
+                <p class="fw-semibold small text-info mb-2">
+                    <i class="fa-solid fa-arrow-right-from-bracket me-1"></i>Post-Cambio
+                </p>
+                <ol class="small text-muted ps-3 mb-0">
+                    {% for item in obj.items.all %}
+                    {% if item.phase == 'post' %}
+                    <li class="mb-1">
+                        {{ item.text }}
+                        {% if not item.required %}<span class="badge bg-secondary-subtle text-secondary-emphasis ms-1">Opcional</span>{% endif %}
+                    </li>
+                    {% endif %}
+                    {% empty %}
+                    <li class="text-muted">Sin ítems</li>
+                    {% endfor %}
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+{% empty %}
+<div class="alert alert-info">
+    <i class="fa-solid fa-circle-info me-2"></i>
+    No hay plantillas. Crea una o ejecuta <code>python manage.py seed_lb_change_templates</code>.
+</div>
+{% endfor %}
+{% endblock %}
