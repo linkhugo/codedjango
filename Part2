@@ -1,0 +1,139 @@
+{# ── Page Help System ──────────────────────────────────────────────────────── #}
+{# Each page fills {% block page_help %} with modal content. If the block      #}
+{# is empty the button is hidden automatically.                                 #}
+<div id="pageHelpContent" class="d-none">{% block page_help %}{% endblock %}</div>
+
+<!-- Floating help button (only shown when a page provides help content) -->
+<button id="helpFloatBtn"
+        class="btn btn-primary rounded-circle shadow d-none btn-float"
+        data-bs-toggle="modal" data-bs-target="#pageHelpModal"
+        title="Ayuda">
+    <i class="fa-solid fa-question"></i>
+</button>
+
+<!-- Help modal -->
+<div class="modal fade" id="pageHelpModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-scrollable mw-560">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header modal-header-blue">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="icon-box-blue">
+                        <i class="fa-solid fa-circle-question fa-lg"></i>
+                    </div>
+                    <h6 class="modal-title fw-bold mb-0">¿Cómo usar esta página?</h6>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4" id="pageHelpModalBody"></div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-primary btn-sm" data-bs-dismiss="modal">
+                    <i class="fa-solid fa-check me-1"></i>Entendido
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+(function () {
+    var src = document.getElementById('pageHelpContent');
+    if (!src || !src.innerHTML.trim()) return;
+    document.getElementById('pageHelpModalBody').innerHTML = src.innerHTML;
+    var btn = document.getElementById('helpFloatBtn');
+    btn.classList.remove('d-none');
+    btn.classList.add('d-flex', 'align-items-center', 'justify-content-center');
+})();
+</script>
+
+<!-- Scripts -->
+<script src="{% static 'vendor/jquery/jquery-3.7.1.min.js' %}"></script>
+<script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+<script src="{% static 'vendor/datatables/js/jquery.dataTables.min.js' %}"></script>
+<script src="{% static 'vendor/datatables/js/dataTables.bootstrap5.min.js' %}"></script>
+<script src="{% static 'vendor/datatables/js/dataTables.buttons.min.js' %}"></script>
+<script src="{% static 'vendor/datatables/js/buttons.bootstrap5.min.js' %}"></script>
+<script src="{% static 'vendor/jszip/jszip.min.js' %}"></script>
+<script src="{% static 'vendor/datatables/js/buttons.html5.min.js' %}"></script>
+<script src="{% static 'vendor/datatables/js/buttons.print.min.js' %}"></script>
+<script src="{% static 'vendor/datatables/js/buttons.colVis.min.js' %}"></script>
+<script src="{% static 'vendor/chartjs/chart.umd.min.js' %}"></script>
+<script src="{% static 'js/custom.js' %}"></script>
+{% block extra_js %}{% endblock %}
+
+{% if user.is_authenticated %}
+<!-- Session timeout: warn at 8 min, logout at 10 min -->
+<div class="modal fade" id="sessionTimeoutModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered mw-400">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-0 pb-1">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="icon-box-warning icon-box-44">
+                        <i class="fa-solid fa-clock fa-lg text-warning"></i>
+                    </div>
+                    <h6 class="modal-title fw-bold mb-0">Sesión por expirar</h6>
+                </div>
+            </div>
+            <div class="modal-body pt-1">
+                <p class="text-muted small mb-2">Tu sesión cerrará en <strong id="sessionCountdown">120</strong> segundos por inactividad.</p>
+                <div class="progress h-5px">
+                    <div id="sessionProgress" class="progress-bar bg-warning progress-timer-bar"></div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 pt-1">
+                <button type="button" class="btn btn-primary btn-sm" id="sessionContinue">
+                    <i class="fa-solid fa-rotate-right me-1"></i>Continuar sesión
+                </button>
+                <form method="post" action="{% url 'logout' %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-secondary btn-sm">Cerrar sesión</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<script nonce="{{ csp_nonce }}">
+(function () {
+    const WARN_MS  = 8 * 60 * 1000;   // 8 minutes → show warning
+    const GRACE_S  = 120;              // 2 more minutes to react
+    let idleTimer, countdownInterval;
+    let modal, bsModal;
+
+    function resetIdle() {
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(showWarning, WARN_MS);
+    }
+
+    function showWarning() {
+        modal = document.getElementById('sessionTimeoutModal');
+        bsModal = new bootstrap.Modal(modal);
+        let remaining = GRACE_S;
+        document.getElementById('sessionCountdown').textContent = remaining;
+        document.getElementById('sessionProgress').style.width = '100%';
+        bsModal.show();
+        countdownInterval = setInterval(() => {
+            remaining--;
+            document.getElementById('sessionCountdown').textContent = remaining;
+            document.getElementById('sessionProgress').style.width = `${(remaining / GRACE_S) * 100}%`;
+            if (remaining <= 0) {
+                clearInterval(countdownInterval);
+                modal.querySelector('form').submit();
+            }
+        }, 1000);
+    }
+
+    document.getElementById('sessionContinue').addEventListener('click', function () {
+        clearInterval(countdownInterval);
+        bootstrap.Modal.getInstance(document.getElementById('sessionTimeoutModal')).hide();
+        resetIdle();
+    });
+
+    ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'].forEach(evt =>
+        document.addEventListener(evt, resetIdle, { passive: true })
+    );
+    resetIdle();
+})();
+</script>
+{% endif %}
+
+</body>
+</html>
