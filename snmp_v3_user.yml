@@ -1,0 +1,208 @@
+---
+# Playbook: snmp_v3_user.yml
+#
+# Crea o modifica un usuario SNMPv3 en dispositivos F5 BIG-IP.
+# Idempotente: verifica si el usuario existe antes de crear o actualizar.
+#
+# No existe módulo nativo bigip_snmp_user — se usa iControlREST directamente.
+#
+# IMPORTANTE: Solo aplica a equipos en estado Failover ACTIVE.
+#
+# Uso:
+#   ansible-playbook snmp_v3_user.yml --ask-vault-pass
+#   ansible-playbook snmp_v3_user.yml -l lb01 --ask-vault-pass
+#
+# Variables en:   vars/snmp_v3_user.yml
+# Contraseña en vault: vault_snmp_v3_auth_password
+
+- hosts: f5_devices
+  gather_facts: false
+  vars_files:
+    - vars/snmp_v3_user.yml
+
+  tasks:
+
+    - name: "Bloque principal con cleanup de token"
+      block:
+
+        - name: "Inicializar sesión y verificar Failover Active"
+          ansible.builtin.include_tasks: tasks/f5_init_active.yml
+
+        - name: "Consultar usuarios SNMPv3 actuales de {{ inventory_hostname }}"
+          ansible.builtin.uri:
+            url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/sys/snmp/users"
+            method: GET
+            headers:
+              X-F5-Auth-Token: "{{ f5_api_token }}"
+            validate_certs: "{{ f5_validate_certs }}"
+            status_code: 200
+            timeout: 30
+          delegate_to: localhost
+          register: _snmp_before
+
+        - name: "SNMPv3 — usuarios ANTES en {{ inventory_hostname }}"
+          ansible.builtin.debug:
+            msg: >-
+              {{
+                _snmp_before.json.items
+                | default([])
+                | map(attribute='name')
+                | list
+                | join(', ')
+                | default('(sin usuarios configurados)')
+              }}
+
+        - name: "Verificar si usuario '{{ snmp_v3_name }}' ya existe"
+          ansible.builtin.uri:
+            url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/sys/snmp/users/{{ snmp_v3_name }}"
+            method: GET
+            headers:
+              X-F5-Auth-Token: "{{ f5_api_token }}"
+            validate_certs: "{{ f5_validate_certs }}"
+            status_code: [200, 404]
+            timeout: 30
+          delegate_to: localhost
+          register: _snmp_user_check
+          no_log: true
+
+        - name: "Crear usuario SNMPv3 '{{ snmp_v3_name }}' (no existe)"
+          ansible.builtin.uri:
+            url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/sys/snmp/users"
+            method: POST
+            headers:
+              X-F5-Auth-Token: "{{ f5_api_token }}"
+            body_format: json
+            body:
+              name:          "{{ snmp_v3_name }}"
+              securityLevel: "{{ snmp_v3_security_level }}"
+              authProto:     "{{ snmp_v3_auth_protocol }}"
+              authPassword:  "{{ snmp_v3_auth_password }}"
+              oidSubset:     "{{ snmp_v3_oid }}"
+            validate_certs: "{{ f5_validate_certs }}"
+            status_code: 200
+            timeout: 30
+          delegate_to: localhost
+          when: _snmp_user_check.status == 404
+          no_log: true
+
+        - name: "Actualizar usuario SNMPv3 '{{ snmp_v3_name }}' (ya existe)"
+          ansible.builtin.uri:
+            url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/sys/snmp/users/{{ snmp_v3_name }}"
+            method: PATCH
+            headers:
+              X-F5-Auth-Token: "{{ f5_api_token }}"
+            body_format: json
+            body:
+              securityLevel: "{{ snmp_v3_security_level }}"
+              authProto:     "{{ snmp_v3_auth_protocol }}"
+              authPassword:  "{{ snmp_v3_auth_password }}"
+              oidSubset:     "{{ snmp_v3_oid }}"
+            validate_certs: "{{ f5_validate_certs }}"
+            status_code: 200
+            timeout: 30
+          delegate_to: localhost
+          when: _snmp_user_check.status == 200
+          no_log: true
+
+        - name: "Consultar usuarios SNMPv3 actualizados de {{ inventory_hostname }}"
+          ansible.builtin.uri:
+            url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/sys/snmp/users"
+            method: GET
+            headers:
+              X-F5-Auth-Token: "{{ f5_api_token }}"
+            validate_certs: "{{ f5_validate_certs }}"
+            status_code: 200
+            timeout: 30
+          delegate_to: localhost
+          register: _snmp_after
+
+        - name: "SNMPv3 — usuarios DESPUÉS en {{ inventory_hostname }}"
+          ansible.builtin.debug:
+            msg: >-
+              {{
+                _snmp_after.json.items
+                | default([])
+                | map(attribute='name')
+                | list
+                | join(', ')
+                | default('(sin usuarios configurados)')
+              }}
+
+        # ── Allowed Addresses ──────────────────────────────────────────────────
+
+        - name: "Consultar allowedAddresses actuales en {{ inventory_hostname }}"
+          ansible.builtin.uri:
+            url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/sys/snmp"
+            method: GET
+            headers:
+              X-F5-Auth-Token: "{{ f5_api_token }}"
+            validate_certs: "{{ f5_validate_certs }}"
+            status_code: 200
+            timeout: 30
+          delegate_to: localhost
+          register: _snmp_allowed_before
+
+        - name: "SNMP allowedAddresses ANTES en {{ inventory_hostname }}"
+          ansible.builtin.debug:
+            msg: >-
+              {{
+                _snmp_allowed_before.json.allowedAddresses
+                | default([])
+                | join(', ')
+                | default('(ninguna)')
+              }}
+
+        - name: "Calcular lista de IPs a aplicar (merge con existentes)"
+          ansible.builtin.set_fact:
+            _snmp_merged_ips: >-
+              {{
+                (_snmp_allowed_before.json.allowedAddresses | default([]))
+                | union(
+                    snmp_v3_allowed_addresses
+                    if snmp_v3_allowed_addresses is not string
+                    else snmp_v3_allowed_addresses.split()
+                  )
+              }}
+          when: snmp_v3_allowed_addresses | length > 0
+
+        - name: "Agregar IPs a SNMP allowedAddresses en {{ inventory_hostname }}"
+          ansible.builtin.uri:
+            url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/sys/snmp"
+            method: PATCH
+            headers:
+              X-F5-Auth-Token: "{{ f5_api_token }}"
+            body_format: json
+            body:
+              allowedAddresses: "{{ _snmp_merged_ips }}"
+            validate_certs: "{{ f5_validate_certs }}"
+            status_code: 200
+            timeout: 30
+          delegate_to: localhost
+          when: snmp_v3_allowed_addresses | length > 0
+
+        - name: "Consultar allowedAddresses actualizadas en {{ inventory_hostname }}"
+          ansible.builtin.uri:
+            url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/sys/snmp"
+            method: GET
+            headers:
+              X-F5-Auth-Token: "{{ f5_api_token }}"
+            validate_certs: "{{ f5_validate_certs }}"
+            status_code: 200
+            timeout: 30
+          delegate_to: localhost
+          register: _snmp_allowed_after
+
+        - name: "SNMP allowedAddresses DESPUÉS en {{ inventory_hostname }}"
+          ansible.builtin.debug:
+            msg: >-
+              {{
+                _snmp_allowed_after.json.allowedAddresses
+                | default([])
+                | join(', ')
+                | default('(ninguna)')
+              }}
+
+      always:
+
+        - name: "Revocar token iControlREST"
+          ansible.builtin.include_tasks: tasks/f5_revoke_token.yml
