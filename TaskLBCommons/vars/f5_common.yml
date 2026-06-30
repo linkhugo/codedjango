@@ -1,0 +1,11 @@
+---
+# Variables comunes para todos los playbooks que usan f5networks.f5_modules.
+# Incluir en vars_files: antes del archivo de vars específico del playbook.
+
+f5_provider:
+  server:         "{{ ansible_host }}"
+  server_port:    "{{ f5_api_port }}"
+  user:           "{{ ansible_user }}"
+  password:       "{{ ansible_password }}"
+  validate_certs: "{{ f5_validate_certs }}"
+  auth_provider:  "{{ f5_auth_provider }}"

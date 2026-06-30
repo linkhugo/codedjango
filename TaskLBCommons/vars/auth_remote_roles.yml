@@ -1,0 +1,28 @@
+---
+# Variables para auth_remote_roles.yml
+#
+# Lista de Remote Role Groups a crear o actualizar (state: present).
+# Campos obligatorios: name, line_order, attribute_string, assigned_role
+#
+# Parámetros del módulo bigip_remote_role:
+#   assigned_role:    no-access | guest | operator | manager | admin | resource-admin
+#   remote_access:    true | false  (acceso remoto habilitado)
+#   terminal_access:  none | tmsh | bash | advanced-shell
+#   partition_access: all | Common | <partición>
+
+auth_remote_role_groups:
+  - name:             "netdeck_ns"
+    line_order:       100
+    attribute_string: "CN=netdeck_ns,OU=Groups,DC=corp,DC=example,DC=com"
+    assigned_role:    "manager"
+    remote_access:    true
+    terminal_access:  "tmsh"
+    partition_access: "all"
+
+  - name:             "network_services_readonly"
+    line_order:       200
+    attribute_string: "CN=network_services_ro,OU=Groups,DC=corp,DC=example,DC=com"
+    assigned_role:    "operator"
+    remote_access:    true
+    terminal_access:  "none"
+    partition_access: "all"

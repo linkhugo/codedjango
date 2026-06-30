@@ -1,0 +1,49 @@
+---
+# Checks: 2.4.1 – 2.4.9
+#
+# NOTA: bigip_sys_sshd no existe en la colección — se usa PATCH a /mgmt/tm/sys/sshd.
+#
+# 2.4.4 → cli/global-settings (idleTimeout) — sin módulo nativo, usa uri
+# 2.4.5 → sys/global-settings (consoleInactivityTimeout) — bigip_sys_global_settings
+
+- name: "2.4.1-2.4.3/2.4.6-2.4.9 — Configurar SSHD (banner, timeout, allow, criptografía)"
+  ansible.builtin.uri:
+    url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/sys/sshd"
+    method: PATCH
+    body_format: json
+    body:
+      banner:            "{{ f5_sshd_banner }}"
+      bannerText:        "{{ f5_sshd_banner_text }}"
+      inactivityTimeout: "{{ f5_sshd_idle_timeout }}"
+      allow:             "{{ f5_sshd_allow }}"
+      include: |
+        KexAlgorithms {{ f5_sshd_kex | replace('\n', '') | replace(' ', '') }}
+        Ciphers {{ f5_sshd_ciphers | replace('\n', '') | replace(' ', '') }}
+        MACs {{ f5_sshd_macs | replace('\n', '') | replace(' ', '') }}
+        HostKeyAlgorithms {{ f5_sshd_hostkeyalgorithms | replace('\n', '') | replace(' ', '') }}
+    headers:
+      X-F5-Auth-Token: "{{ f5_api_token }}"
+    validate_certs:   "{{ f5_validate_certs }}"
+    status_code: 200
+    timeout: 30
+  delegate_to: localhost
+
+# Sin módulo nativo para cli/global-settings idleTimeout
+- name: "2.4.4 — Configurar CLI idle timeout"
+  ansible.builtin.uri:
+    url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/cli/global-settings"
+    method: PATCH
+    body_format: json
+    body:
+      idleTimeout: "{{ f5_cli_idle_timeout }}"
+    headers:
+      X-F5-Auth-Token: "{{ f5_api_token }}"
+    validate_certs:   "{{ f5_validate_certs }}"
+    status_code: 200
+    timeout: 30
+  delegate_to: localhost
+
+- name: "2.4.5 — Configurar console inactivity timeout"
+  f5networks.f5_modules.bigip_sys_global_settings:
+    console_timeout: "{{ f5_console_idle_timeout }}"
+    provider:        "{{ f5_provider }}"

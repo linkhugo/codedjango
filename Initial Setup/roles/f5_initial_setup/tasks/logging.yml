@@ -1,0 +1,22 @@
+---
+# Checks: 2.6.4 – 2.6.14
+#
+# 2.6.4–2.6.12 → deshabilitar acceso a logs por rol (f5_logaccess_db_keys)
+# 2.6.13       → habilitar MCP audit logging (config.auditing = enable)
+#                incluido en f5_logaccess_db_keys para loop unificado
+# 2.6.14       → habilitar GUI audit logging (sys/global-settings guiAudit)
+
+- name: "2.6.4-2.6.13 — Configurar log access y MCP audit (DB keys)"
+  f5networks.f5_modules.bigip_sys_db:
+    key:      "{{ _key.name }}"
+    value:    "{{ _key.value }}"
+    provider: "{{ f5_provider }}"
+  loop: "{{ f5_logaccess_db_keys }}"
+  loop_control:
+    loop_var: _key
+    label:    "{{ _key.name }}"
+
+- name: "2.6.14 — Habilitar GUI audit logging"
+  f5networks.f5_modules.bigip_sys_global_settings:
+    gui_audit: "enabled"
+    provider:  "{{ f5_provider }}"

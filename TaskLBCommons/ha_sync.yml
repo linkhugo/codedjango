@@ -1,0 +1,87 @@
+---
+# Playbook: ha_sync.yml
+#
+# Fuerza la sincronización de configuración desde el equipo Active
+# hacia el device group HA (Active → Standby).
+#
+# IMPORTANTE: Solo aplica al equipo en estado Failover ACTIVE,
+# que es el correcto para empujar la configuración al grupo.
+#
+# Uso:
+#   ansible-playbook ha_sync.yml --ask-vault-pass
+#   ansible-playbook ha_sync.yml -l lb01 --ask-vault-pass
+
+- hosts: f5_devices
+  gather_facts: false
+  vars_files:
+    - vars/f5_common.yml
+    - vars/ha_sync.yml
+
+  tasks:
+
+    - name: "Bloque principal con cleanup de token"
+      block:
+
+        - name: "Inicializar sesión y verificar Failover Active"
+          ansible.builtin.include_tasks: tasks/f5_init_active.yml
+
+        - name: "Consultar estado de sincronía actual de {{ inventory_hostname }}"
+          ansible.builtin.uri:
+            url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/cm/sync-status"
+            method: GET
+            headers:
+              X-F5-Auth-Token: "{{ f5_api_token }}"
+            validate_certs: "{{ f5_validate_certs }}"
+            status_code: 200
+            timeout: 30
+          delegate_to: localhost
+          register: _sync_before
+
+        - name: "Publicar estado de sincronía actual"
+          ansible.builtin.set_fact:
+            _sync_status: >-
+              {{
+                _sync_before.json
+                | json_query('entries.*.nestedStats.entries.status.description')
+                | first | default('desconocido')
+              }}
+
+        - name: "HA Sync — estado ANTES en {{ inventory_hostname }}"
+          ansible.builtin.debug:
+            msg: "{{ _sync_status }}"
+
+        - name: "Omitir sync — dispositivos ya sincronizados ({{ _sync_status }})"
+          ansible.builtin.meta: end_host
+          when: _sync_status | lower == 'in sync'
+
+        - name: "Forzar sync de configuración al device group '{{ ha_device_group }}' ({{ _sync_status }})"
+          f5networks.f5_modules.bigip_configsync_action:
+            device_group:          "{{ ha_device_group }}"
+            sync_device_to_group:  true
+            provider:              "{{ f5_provider }}"
+
+        - name: "Consultar estado de sincronía actualizado de {{ inventory_hostname }}"
+          ansible.builtin.uri:
+            url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/cm/sync-status"
+            method: GET
+            headers:
+              X-F5-Auth-Token: "{{ f5_api_token }}"
+            validate_certs: "{{ f5_validate_certs }}"
+            status_code: 200
+            timeout: 30
+          delegate_to: localhost
+          register: _sync_after
+
+        - name: "HA Sync — estado DESPUÉS en {{ inventory_hostname }}"
+          ansible.builtin.debug:
+            msg: >-
+              {{
+                _sync_after.json
+                | json_query('entries.*.nestedStats.entries.status.description')
+                | first | default('desconocido')
+              }}
+
+      always:
+
+        - name: "Revocar token iControlREST"
+          ansible.builtin.include_tasks: tasks/f5_revoke_token.yml

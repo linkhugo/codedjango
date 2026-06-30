@@ -1,0 +1,27 @@
+---
+# Checks: NS_STD_001, NS_STD_002, NS_STD_003, NS_STD_012, NS_STD_031
+#
+# NS_STD_012 — Root login deshabilitado (systemauth.disablerootlogin)
+# NS_STD_001 — Advisory banner habilitado (ui.advisory.enabled)
+# NS_STD_002 — Color del advisory banner (ui.advisory.color)
+# NS_STD_003 — Start screen = performance (ui.system.preferences.startscreen)
+# NS_STD_031 — Hostname del dispositivo = inventory_hostname
+#
+# Los checks 001/002/003/012 se configuran via bigip_sys_db (loop unificado).
+# El check 031 usa bigip_sys_global_settings.
+
+- name: "NS_STD_012/001/002/003 — Configurar DB keys de sistema"
+  f5networks.f5_modules.bigip_sys_db:
+    key:      "{{ _db.name }}"
+    value:    "{{ _db.value }}"
+    provider: "{{ f5_provider }}"
+  loop: "{{ f5_system_db_keys }}"
+  loop_control:
+    loop_var: _db
+    label:    "{{ _db.name }}"
+
+- name: "NS_STD_031 — Configurar hostname del dispositivo"
+  f5networks.f5_modules.bigip_sys_global_settings:
+    hostname: "{{ inventory_hostname }}"
+    provider: "{{ f5_provider }}"
+  when: f5_system_set_hostname | bool

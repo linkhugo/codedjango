@@ -1,0 +1,74 @@
+---
+# Checks: 2.2.1 – 2.2.5
+# Configura la fuente de autenticación, rol remoto por defecto y acceso consola.
+#
+# NOTA: bigip_auth_source, bigip_auth_active_directory y bigip_auth_ldap
+# no existen en la colección — se usa URI con Basic Auth para todos.
+
+# 2.2.1/2.2.3 — Fuente de autenticación y fallback
+- name: "2.2.1/2.2.3 — Configurar fuente de autenticación (tipo y fallback)"
+  ansible.builtin.uri:
+    url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/auth/source"
+    method: PATCH
+    body_format: json
+    body:
+      type:     "{{ f5_auth_type }}"
+      fallback: "{{ f5_auth_fallback | bool }}"
+    headers:
+      X-F5-Auth-Token: "{{ f5_api_token }}"
+    validate_certs:   "{{ f5_validate_certs }}"
+    status_code: 200
+    timeout: 30
+  delegate_to: localhost
+
+# 2.2.4/2.2.5 — Rol remoto por defecto y acceso consola
+- name: "2.2.4/2.2.5 — Configurar rol remoto por defecto y acceso consola"
+  ansible.builtin.uri:
+    url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/auth/remote-user"
+    method: PATCH
+    body_format: json
+    body:
+      defaultRole:         "{{ f5_auth_default_role }}"
+      remoteConsoleAccess: "{{ f5_auth_remote_console }}"
+    headers:
+      X-F5-Auth-Token: "{{ f5_api_token }}"
+    validate_certs:   "{{ f5_validate_certs }}"
+    status_code: 200
+    timeout: 30
+  delegate_to: localhost
+
+# 2.2.2 — Servidores Active Directory
+- name: "2.2.2 — Configurar servidores Active Directory"
+  ansible.builtin.uri:
+    url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/auth/active-directory"
+    method: PATCH
+    body_format: json
+    body:
+      servers: "{{ f5_auth_servers }}"
+    headers:
+      X-F5-Auth-Token: "{{ f5_api_token }}"
+    validate_certs:   "{{ f5_validate_certs }}"
+    status_code: 200
+    timeout: 30
+  delegate_to: localhost
+  when:
+    - f5_auth_type == "active-directory"
+    - f5_auth_servers | length > 0
+
+# 2.2.2 — Servidores LDAP
+- name: "2.2.2 — Configurar servidores LDAP"
+  ansible.builtin.uri:
+    url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/auth/ldap"
+    method: PATCH
+    body_format: json
+    body:
+      servers: "{{ f5_auth_servers }}"
+    headers:
+      X-F5-Auth-Token: "{{ f5_api_token }}"
+    validate_certs:   "{{ f5_validate_certs }}"
+    status_code: 200
+    timeout: 30
+  delegate_to: localhost
+  when:
+    - f5_auth_type == "ldap"
+    - f5_auth_servers | length > 0

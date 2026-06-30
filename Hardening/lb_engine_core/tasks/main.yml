@@ -1,0 +1,56 @@
+#SPDX-License-Identifier: MIT-0
+---
+# tasks file for lb_engine_core
+
+- name: "Inicializar fecha y acumulador de resultados"
+  ansible.builtin.set_fact:
+    fecha_actual: "{{ now(utc=True, fmt='%Y-%m-%d') }}"
+    resultados: []
+
+- name: "Extraer categorias unicas del catalogo de checks"
+  ansible.builtin.set_fact:
+    categorias: "{{ checks | map(attribute='categoria') | list | unique }}"
+
+- name: "Bloque principal de auditoria con garantia de revocacion de token"
+  block:
+
+    - name: "Obtener token iControlREST"
+      ansible.builtin.include_tasks: get_token.yml
+
+    - name: "Procesar checks de la categoria {{ categoria_actual }}"
+      ansible.builtin.include_tasks: run_categoria.yml
+      loop: "{{ categorias }}"
+      loop_control:
+        loop_var: categoria_actual
+
+  always:
+
+    - name: "Revocar token iControlREST"
+      ansible.builtin.include_tasks: revoke_token.yml
+
+- name: "Crear directorio de salida en el controller"
+  ansible.builtin.file:
+    path: "{{ hardening_output_dir }}"
+    state: directory
+    mode: '0755'
+  delegate_to: localhost
+  run_once: true
+  when: lb_generate_csv | default(true)
+
+- name: "Generar CSV"
+  ansible.builtin.copy:
+    dest: "{{ hardening_output_dir }}/hardening_{{ fecha_actual }}.csv"
+    content: |
+      Device,Code,Descripcion,Valor_Obtenido,Valor_Recomendado,Resultado,Comando_Para_Validar,fecha
+      {% for host in ansible_play_hosts %}
+      {% for r in hostvars[host].resultados %}
+      {{ r.Device }}, {{ r.Code }}, {{ r.Descripcion }},{{ r.Valor_Obtenido | replace (',', ';')}},{{ r.Valor_Recomendado | replace(',',';') }},{{ r.Resultado }},{{ r.Comando_Para_Validar }},{{ r.fecha }}
+      {% endfor %}
+      {% endfor %}
+  delegate_to: localhost
+  run_once: true
+  when: lb_generate_csv | default(true)
+
+- name: "Enviar resultados a la API Django"
+  ansible.builtin.include_tasks: push_to_api.yml
+  when: lb_api_push | default(false)

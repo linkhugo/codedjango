@@ -1,0 +1,165 @@
+---
+# defaults/main.yml — Valores por defecto del rol f5_initial_setup
+# Sobreescribir en inventory/group_vars/f5_devices.yml según el sitio.
+
+# ── iControlREST / f5networks.f5_modules ─────────────────────────────────────
+f5_api_port:       443
+f5_validate_certs: false
+# Vida del token iControlREST que comparten las tareas uri (f5_get_token.yml).
+# Los módulos f5networks.f5_modules gestionan su propio token aparte.
+f5_token_timeout:  3600
+f5_auth_provider:  "tmos"     # cambiar a "ldap" o nombre del origen AD si aplica
+
+# Provider dict consumido por todos los módulos f5networks.f5_modules
+f5_provider:
+  server:         "{{ ansible_host }}"
+  server_port:    "{{ f5_api_port }}"
+  user:           "{{ ansible_user }}"
+  password:       "{{ ansible_password }}"
+  validate_certs: "{{ f5_validate_certs }}"
+  auth_provider:  "{{ f5_auth_provider }}"
+
+# ── Skip flags — poner true para omitir una categoría ────────────────────────
+f5_skip_password_policy: false
+f5_skip_auth_source:     false
+f5_skip_httpd:           false
+f5_skip_sshd:            false
+f5_skip_ntp:             false
+f5_skip_self_ip:         false
+f5_skip_named:           false
+f5_skip_snmp:            false
+f5_skip_logging:         false
+f5_skip_mgmt_route:      false
+f5_skip_system:          false
+f5_skip_dns:             false
+f5_skip_remote_roles:    false
+
+# ── Management Route (NS_STD_026) ─────────────────────────────────────────────
+# La ruta de management es fija (name, network, description); solo el gateway
+# varía por sitio. Definir f5_mgmt_gateway en group_vars/host_vars del sitio.
+# Si f5_mgmt_gateway queda vacío, la ruta no se aplica.
+f5_mgmt_gateway: ""   # obligatorio: IP del gateway de gestión del sitio
+f5_mgmt_routes:
+  - name:        "route_to_mgmt"
+    network:     "10.0.0.0/8"
+    gateway:     "{{ f5_mgmt_gateway }}"
+    description: "Red corporativa"
+
+# ── 2.1.x — Password Policy ──────────────────────────────────────────────────
+f5_password_enforcement:        "enabled"
+f5_password_min_length:         15
+f5_password_required_lower:     1
+f5_password_required_upper:     1
+f5_password_required_special:   1
+f5_password_memory:             15
+# NS_STD_011 — max-duration en días
+f5_password_max_duration:       60
+# NS_STD_022 — expiration-warning en días
+f5_password_expiration_warning: 7
+
+# ── 2.2.x — Auth Source ──────────────────────────────────────────────────────
+# f5_auth_servers se define por entidad en entities/<entity>.yml.
+f5_auth_type:           "active-directory"   # opciones: active-directory, ldap
+f5_auth_fallback:       true                 # era string "true" — corregido a boolean
+f5_auth_default_role:   "no-access"
+f5_auth_remote_console: "disabled"
+
+# ── 2.3.x + 2.5.2 — HTTPD ────────────────────────────────────────────────────
+f5_httpd_idle_timeout:              599
+f5_httpd_allow:                     []                   # obligatorio: ["10.0.0.0/8"]
+f5_httpd_ssl_protocol:              "tlsv1.2 tlsv1.3"
+# 2.5.2 — FileETag (K14206/K12036): excluir el inode del header ETag
+f5_httpd_fileetag:                  "MTime Size"
+# CVE-2020-5902 / K52145254 — mitigación TMUI RCE que se AÑADE al include del httpd.
+# El campo 'include' de sys httpd es un único string: el rol combina
+# "FileETag {{ f5_httpd_fileetag }}" con este bloque para que ambos coexistan.
+# Vaciar ("") para no aplicar la mitigación (p.ej. en versiones ya parcheadas).
+f5_httpd_include_extra: |-
+  <LocationMatch ";">
+  Redirect 404 /
+  </LocationMatch>
+  <LocationMatch "hsqldb">
+  Redirect 404 /
+  </LocationMatch>
+# NS_STD_014 — redirigir HTTP a HTTPS
+f5_httpd_redirect_http_to_https:    "enabled"
+# NS_STD_015 — máximo de conexiones HTTP simultáneas
+f5_httpd_max_clients:               10
+# NS_STD_024 — dashboard timeout
+f5_httpd_auth_pam_dashboard_timeout: "on"
+# NS_STD_025 — validar IP en sesión PAM
+f5_httpd_auth_pam_validate_ip:      "on"
+
+# ── 2.4.x — SSHD ─────────────────────────────────────────────────────────────
+f5_sshd_banner:       "enabled"
+f5_sshd_banner_text:  "Authorized use only. Unauthorized access is prohibited."
+f5_sshd_idle_timeout: 599
+f5_sshd_allow:        []                     # obligatorio: ["10.0.0.0/8"]
+f5_sshd_kex: >-
+  ecdh-sha2-nistp521,ecdh-sha2-nistp384,ecdh-sha2-nistp256,
+  diffie-hellman-group16-sha512,diffie-hellman-group18-sha512
+f5_sshd_ciphers: >-
+  aes256-gcm@openssh.com,aes128-gcm@openssh.com
+f5_sshd_macs: >-
+  hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,
+  hmac-sha2-256,hmac-sha2-512
+f5_sshd_hostkeyalgorithms: >-
+  ssh-rsa,rsa-sha2-512,rsa-sha2-256,ssh-ed25519
+f5_cli_idle_timeout:     599
+f5_console_idle_timeout: 599
+
+# ── 2.5.1 — NTP ──────────────────────────────────────────────────────────────
+# f5_ntp_servers y f5_ntp_timezone se definen por entidad en entities/<entity>.yml.
+
+# ── 2.5.4 — Named service ────────────────────────────────────────────────────
+# false → solo detiene named (no persistente en todos los TMOS)
+# true  → detiene Y deshabilita named (TMOS 14+, solo si no se usa DNS local)
+f5_named_persistent_stop: false
+
+# ── 2.6.1–2.6.3 — SNMP ───────────────────────────────────────────────────────
+# f5_snmp_allowed_addresses y f5_snmpv3_users (lista de usuarios; campos opcionales
+# security_level/auth_protocol/priv_protocol/oid_subset usan defaults en snmp.yml)
+# se definen por entidad en entities/<entity>.yml. Las contraseñas viven en el vault.
+
+# ── 2.6.4–2.6.13 — Log Access DB keys ────────────────────────────────────────
+# Lista de dicts {name, value} consumida por bigip_sys_db en loop.
+# config.auditing (check 2.6.13) incluido aquí para unificar el loop.
+# DEPRECATED: f5_logaccess_keys (flat list) reemplazado por f5_logaccess_db_keys.
+f5_logaccess_db_keys:
+  - { name: "ui.logaccess.firewallmanager",         value: "disable" }
+  - { name: "ui.logaccess.accelartionpolicyeditor",  value: "disable" }
+  - { name: "ui.logaccess.guest",                    value: "disable" }
+  - { name: "ui.logaccess.operator",                 value: "disable" }
+  - { name: "ui.logaccess.applicationeditor",        value: "disable" }
+  - { name: "ui.logaccess.manager",                  value: "disable" }
+  - { name: "ui.logaccess.irulemanager",             value: "disable" }
+  - { name: "ui.logaccess.certificatemanager",       value: "disable" }
+  - { name: "ui.logaccess.usermanager",              value: "disable" }
+  - { name: "config.auditing",                        value: "enable"  }
+
+# ── NS_STD_001/002/003/012 — System DB keys ──────────────────────────────────
+# NS_STD_012: systemauth.disablerootlogin = true
+# NS_STD_001: ui.advisory.enabled         = true
+# NS_STD_002: ui.advisory.color           = green por defecto (cambiable por equipo)
+# NS_STD_003: ui.system.preferences.startscreen = performance
+f5_advisory_color: "green"   # default; sobreescribir por host: blue, orange, yellow, red, etc.
+f5_system_db_keys:
+  - { name: "systemauth.disablerootlogin",              value: "true" }
+  - { name: "ui.advisory.enabled",                       value: "true" }
+  - { name: "ui.advisory.color",                         value: "{{ f5_advisory_color }}" }
+  - { name: "ui.system.preferences.startscreen",         value: "performance" }
+
+# NS_STD_031 — Configurar hostname igual al inventory_hostname
+# Poner false si el hostname ya está configurado y no debe modificarse.
+f5_system_set_hostname: true
+
+# ── NS_STD_010 — DNS ─────────────────────────────────────────────────────────
+# f5_dns_servers (mínimo 2) y f5_dns_search se definen por entidad en entities/<entity>.yml.
+
+# ── NS_STD_016/017 — Remote Role Groups ──────────────────────────────────────
+# f5_remote_role_groups se define por entidad en entities/<entity>.yml.
+# Campos del módulo bigip_remote_role (nombres correctos):
+#   attribute_string  (no "attribute")
+#   remote_access     bool (no "access_type")
+#   terminal_access   (no "console"): none | tmsh | bash
+#   partition_access  (no "partition"): all | Common

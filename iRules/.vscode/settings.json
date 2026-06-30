@@ -1,0 +1,5 @@
+{
+    "files.associations": {
+        "*.tcl": "f5-tcl"
+    }
+}

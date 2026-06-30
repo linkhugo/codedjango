@@ -1,0 +1,6 @@
+---
+# Variables para snmp_v1v2c.yml
+# Deshabilitar SNMPv1 y SNMPv2c en dispositivos F5 BIG-IP.
+
+snmp_v1_state:   "disable"   # disable | enable
+snmp_v2c_state:  "disable"   # disable | enable

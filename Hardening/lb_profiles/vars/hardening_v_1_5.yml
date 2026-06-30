@@ -1,0 +1,504 @@
+checks:
+
+  - categoria: "2.1"
+    code: "2.1.1"
+    descripcion: " Status Policy"
+    cmd: "list auth password-policy policy-enforcement | grep policy-enforcement | awk {'print $2'}"
+    api_path: "/mgmt/tm/auth/password-policy"
+    campo: "policyEnforcement"
+    valor_recomendado: "Se debe tener el valor enabled | modify auth password-policy policy-enforcement enabled"
+    policy:
+      - type: allow_any
+        values: ["enabled"]
+
+  - categoria: "2.1"
+    code: "2.1.2"
+    descripcion: " Status minimum length"
+    cmd: "list auth password-policy minimum-length | grep minimum-length | awk {'print $2'}"
+    api_path: "/mgmt/tm/auth/password-policy"
+    campo: "minimumLength"
+    valor_recomendado: "Valor igual a 15 | modify auth password-policy minimum-length 15"
+    policy:
+      - type: numeric_eq
+        value: 15
+
+  - categoria: "2.1"
+    code: "2.1.3"
+    descripcion: " Status minimum lowercase"
+    cmd: "list auth password-policy required-lowercase | grep required-lowercase| awk {'print $2'}"
+    api_path: "/mgmt/tm/auth/password-policy"
+    campo: "requiredLowercase"
+    valor_recomendado: "Valor igual a 1 | modify auth password-policy required-lowercase 1"
+    policy:
+      - type: numeric_eq
+        value: 1
+
+  - categoria: "2.1"
+    code: "2.1.4"
+    descripcion: " Status minimum uppercase"
+    cmd: "list auth password-policy required-uppercase | grep required-uppercase | awk {'print $2'}"
+    api_path: "/mgmt/tm/auth/password-policy"
+    campo: "requiredUppercase"
+    valor_recomendado: "Valor igual a 1 | modify auth password-policy required-uppercase 1"
+    policy:
+      - type: numeric_eq
+        value: 1
+
+  - categoria: "2.1"
+    code: "2.1.5"
+    descripcion: " Status minimum special caracters"
+    cmd: "list auth password-policy required-special | grep required-special | awk {'print $2'}"
+    api_path: "/mgmt/tm/auth/password-policy"
+    campo: "requiredSpecial"
+    valor_recomendado: "Valor igual a 1 | modify auth password-policy required-special 1"
+    policy:
+      - type: numeric_eq
+        value: 1
+
+  - categoria: "2.1"
+    code: "2.1.6"
+    descripcion: " Status password memory"
+    cmd: "list auth password-policy password-memory | grep password-memory | awk {'print $2'}"
+    api_path: "/mgmt/tm/auth/password-policy"
+    campo: "passwordMemory"
+    valor_recomendado: "Valor igual a 15 | modify auth password-policy password-memory 15"
+    policy:
+      - type: numeric_eq
+        value: 15
+
+  - categoria: "2.2"
+    code: "2.2.1"
+    descripcion: " Status TACACS-RADIUS-LDAP"
+    cmd: "list auth source type | grep type | awk {'print $2'}"
+    api_path: "/mgmt/tm/auth/source"
+    campo: "type"
+    valor_recomendado: "active-directory o ldap | modify auth source type active-directory"
+    policy:
+      - type: allow_any
+        values: ["active-directory","ldap"]
+
+  - categoria: "2.2"
+    code: "2.2.2"
+    descripcion: " Status TACACS-RADIUS-LDAP"
+    cmd: "list auth ldap servers | grep servers | awk {'print $3'}"
+    api_path: "/mgmt/tm/auth/ldap"
+    campo: "servers"
+    valor_recomendado: "Configurar sea el caso de la Entidad"
+    policy:
+      - type: allow_any
+        values: ["ldap.corp","ldap2.corp"]
+
+  - categoria: "2.2"
+    code: "2.2.3"
+    descripcion: " Status Fallback"
+    cmd: "list auth source fallback | grep fallback | awk {'print $2'}"
+    api_path: "/mgmt/tm/auth/source"
+    campo: "fallback"
+    valor_recomendado: "True | modify auth source fallback true"
+    policy:
+      - type: allow_any
+        values: ["true"]
+
+  - categoria: "2.2"
+    code: "2.2.4"
+    descripcion: " Status default role "
+    cmd: "list auth remote-user default-role | grep default-role | awk {'print $2'}"
+    api_path: "/mgmt/tm/auth/remote-user"
+    campo: "defaultRole"
+    valor_recomendado: "no-access | modify auth remote-user default-role no-access"
+    policy:
+      - type: allow_any
+        values: ["no-access"]
+
+  - categoria: "2.2"
+    code: "2.2.5"
+    descripcion: "Status Terminal Access "
+    cmd: "list auth remote-user remote-console-access | grep remote-console-access | awk {'print $2'}"
+    api_path: "/mgmt/tm/auth/remote-user"
+    campo: "remoteConsoleAccess"
+    valor_recomendado: "disabled | modify auth remote-user remote-console-access disabled"
+    policy:
+      - type: allow_any
+        values: ["disabled"]
+
+  - categoria: "2.3"
+    code: "2.3.1"
+    descripcion: "Status login idle  "
+    cmd: "list sys httpd auth-pam-idle-timeout | grep auth-pam-idle-timeout | awk {'print $2'}"
+    api_path: "/mgmt/tm/sys/httpd"
+    campo: "authPamIdleTimeout"
+    valor_recomendado: "Igual a 599 segundos | modify sys httpd auth-pam-idle-timeout 599"
+    policy:
+      - type: numeric_eq
+        value: 599
+
+  - categoria: "2.3"
+    code: "2.3.2"
+    descripcion: "Status allowed IP httpd  "
+    cmd: "list sys httpd allow | grep allow | awk -F'[{}]' '{print $2}' "
+    api_path: "/mgmt/tm/sys/httpd"
+    campo: "allow"
+    valor_recomendado: "Colocar un segmento de red en especifico normalmente colocar 22.0.0.0/255.0.0.0 y no dejar en blanco"
+    policy:
+      - type: deny
+        values: ["0.0.0.0/0","none","","all"]
+      - type: not_empty
+
+  - categoria: "2.3"
+    code: "2.3.3"
+    descripcion: "status of SSL Protocol"
+    cmd: "list sys httpd ssl-protocol | grep ssl-protocol | awk {'print $2'}"
+    api_path: "/mgmt/tm/sys/httpd"
+    campo: "sslProtocol"
+    valor_recomendado: "tlsv1.2 y/o tlsv1.3 | modify sys httpd ssl-protocol tlsv1.2"
+    policy:
+      - type: allow_any
+        values: ["tlsv1.2","tlsv1.3"]
+      - type: deny
+        values: ["all","sslv2","sslv3","tlsv1","tlsv1.1"]
+
+  - categoria: "2.4"
+    code: "2.4.1"
+    descripcion: "Status of Banner"
+    cmd: "list sys sshd banner-text | grep -i F5"
+    api_path: "/mgmt/tm/sys/sshd"
+    campo: "bannerText"
+    display_keyword: "F5"
+    valor_recomendado: "Banner Representativo"
+    policy:
+      - type: deny
+        values: ["none",""]
+      - type: not_empty
+
+  - categoria: "2.4"
+    code: "2.4.2"
+    descripcion: "Status of Banner SSHD"
+    cmd: "list sys sshd banner | grep banner | awk {'print $2'}"
+    api_path: "/mgmt/tm/sys/sshd"
+    campo: "banner"
+    valor_recomendado: "enabled | modify sys sshd banner enabled"
+    policy:
+      - type: allow_any
+        values: ["enabled"]
+
+  - categoria: "2.4"
+    code: "2.4.3"
+    descripcion: "Status of SSH inactivity-timeout"
+    cmd: "list sys sshd inactivity-timeout | grep inactivity-timeout | awk {'print $2'}"
+    api_path: "/mgmt/tm/sys/sshd"
+    campo: "inactivityTimeout"
+    valor_recomendado: "Valor igual a 599 | modify sys sshd inactivity-timeout 599"
+    policy:
+      - type: numeric_eq
+        value: 599
+
+  - categoria: "2.4"
+    code: "2.4.4"
+    descripcion: "Status of the CLI timeout"
+    cmd: "list cli global-settings idle-timeout | grep idle-timeout | awk {'print $2'}"
+    api_path: "/mgmt/tm/cli/global-settings"
+    campo: "idleTimeout"
+    valor_recomendado: "Valor igual a 599 | modify cli global-settings idle-timeout 599"
+    policy:
+      - type: numeric_eq
+        value: 599
+
+  - categoria: "2.4"
+    code: "2.4.5"
+    descripcion: "Status console timeout"
+    cmd: "list sys global-settings console-inactivity-timeout | grep console-inactivity-timeout | awk {'print $2'}"
+    api_path: "/mgmt/tm/sys/global-settings"
+    campo: "consoleInactivityTimeout"
+    valor_recomendado: "Valor igual a 599 | modify sys global-settings console-inactivity-timeout 599"
+    policy:
+      - type: numeric_eq
+        value: 599
+
+  - categoria: "2.4"
+    code: "2.4.6"
+    descripcion: "Status of the Key Exchange Methods for SSH"
+    cmd: "list sys sshd include | grep -i KexAlgorithms"
+    api_path: "/mgmt/tm/sys/sshd"
+    campo: "include"
+    display_keyword: "KexAlgorithms"
+    valor_recomendado: "Varios Kex"
+    policy:
+      - type: deny_contains
+        pattern: "group14-sha1|diffie-hellman-group-exchange-sha256|sha1$"
+      - type: allow_any
+        values:
+           - "ecdh-sha2-nistp256"
+           - "cdh-sha2-nistp384e"
+           - "ecdh-sha2-nistp521"
+           - "diffie-hellman-group16-sha512"
+           - "diffie-hellman-group18-sha512"
+
+
+  - categoria: "2.4"
+    code: "2.4.7"
+    descripcion: "Status of the Ciphers for SSH"
+    cmd: "list sys sshd include | grep -i Ciphers"
+    api_path: "/mgmt/tm/sys/sshd"
+    campo: "include"
+    display_keyword: "Ciphers"
+    valor_recomendado: "Varios Ciphers"
+    policy:
+      - type: deny_contains
+        pattern: "cbc|arcfour|3des|blowfish|des$|ctr$"
+      - type: allow_any
+        values:
+           - "aes256-gcm@openssh.com"
+           - "aes128-gcm@openssh.com"
+
+
+  - categoria: "2.4"
+    code: "2.4.8"
+    descripcion: "Status allowed IP sshd  "
+    cmd: "list sys sshd allow| grep allow | awk -F'[{}]' '{print $2}' "
+    api_path: "/mgmt/tm/sys/sshd"
+    campo: "allow"
+    valor_recomendado: "Colocar un segmento de red en especifico normalmente colocar 22.0.0.0/255.0.0.0 y no dejar en blanco"
+    policy:
+      - type: deny
+        values: ["0.0.0.0/0","none","","all"]
+      - type: not_empty
+
+
+  - categoria: "2.4"
+    code: "2.4.9"
+    descripcion: "Status of the MAC for SSH"
+    cmd: "list sys sshd include | grep -i MACs"
+    api_path: "/mgmt/tm/sys/sshd"
+    campo: "include"
+    display_keyword: "MACs"
+    valor_recomendado: "Varios MACs"
+    policy:
+      - type: deny_contains
+        pattern: "md5|sha1(?!-etm)|hmac-sha1$|-96$"
+      - type: allow_any
+        values:
+           - "hmac-sha2-256"
+           - "hmac-sha2-512"
+
+  - categoria: "2.5"
+    code: "2.5.1"
+    descripcion: "List of NTP Servers configured on the host"
+    cmd: "list sys ntp servers | grep servers | awk -F'[{}]' '{print $2}' "
+    api_path: "/mgmt/tm/sys/ntp"
+    campo: "servers"
+    valor_recomendado: "Se debe tener al menos dos NTP Configurados"
+    policy:
+      - type: min_entry_count
+        value: 2
+  
+  - categoria: "2.5"
+    code: "2.5.2"
+    descripcion: "Status of the node idone information"
+    cmd: "list sys httpd include | grep -i 'FileETag MTime Size' "
+    api_path: "/mgmt/tm/sys/httpd"
+    campo: "include"
+    display_line: "FileETag"
+    valor_recomendado: "Se debe tener el FileEtag Mtime Size dentro del httpd"
+    policy:
+      - type: allow_any
+        values: ["fileetag"]
+
+
+  - categoria: "2.5"
+    code: "2.5.3"
+    descripcion: "List of allow-service configured for all Self IP Addresess"
+    cmd: "list net self oneline "
+    api_path: "/mgmt/tm/net/self"
+    campo: "allowService"
+    valor_recomendado: "Se debe configurar con none o solamente los puertos tcp:1028,tcp:4353,udp:1026"
+    policy:
+      - type: allow_only
+        values: ["tcp:1028", "tcp:4353", "udp:1026", "none"]
+
+  - categoria: "2.5"
+    code: "2.5.4"
+    descripcion: "List of the services on the host"
+    cmd: "show sys service named "
+    api_path: "/mgmt/tm/sys/service/named/stats/"
+    campo: "apiRawValues.apiAnonymous"
+    valor_recomendado: "El servicio named debe estar en modo stopped"
+    policy:
+      - type: not_empty
+      - type: deny_contains
+        pattern: "running|active|starting"
+  
+  - categoria: "2.6"
+    code: "2.6.1"
+    descripcion: "Status Allowed SNMP Clients"
+    cmd: "list sys snmp allowed-addresses | grep allowed-addresses | awk -F'[{}]' '{print $2}'"
+    api_path: "/mgmt/tm/sys/snmp"
+    campo: "allowedAddresses"
+    valor_recomendado: "Colocar un segmento de red en especifico normalmente colocar 22.0.0.0/255.0.0.0 y no dejar en blanco"
+    policy:
+      - type: deny
+        values: ["0.0.0.0/0","none","","all"]
+      - type: not_empty
+
+  - categoria: "2.6"
+    code: "2.6.2.1"
+    descripcion: "Status of the SNMP community strings SNMPv1"
+    cmd: "list sys snmp snmpv1 | grep snmpv1 | awk {'print $2'}"
+    api_path: "/mgmt/tm/sys/snmp"
+    campo: "snmpv1"
+    valor_recomendado: "El valor recomendado es disable | modify sys snmp snmpv1 disable"
+    policy:
+      - type: allow_any
+        values: ["disable"]
+
+  - categoria: "2.6"
+    code: "2.6.2.2"
+    descripcion: "Status of the SNMP community strings SNMPv2c"
+    cmd: "list sys snmp snmpv2c | grep snmpv2c | awk {'print $2'}"
+    api_path: "/mgmt/tm/sys/snmp"
+    campo: "snmpv2c"
+    valor_recomendado: "El valor recomendado es disable | modify sys snmp snmpv2c disable"
+    policy:
+      - type: allow_any
+        values: ["disable"]
+
+  - categoria: "2.6"
+    code: "2.6.2"
+    descripcion: "Status of the SNMP community strings "
+    cmd: "list sys snmp communities | grep communities | awk {'print $2'}"
+    api_path: "/mgmt/tm/sys/snmp"
+    campo: "communities"
+    valor_recomendado: "El valor recomendado es none, no se debe tener communities"
+    policy:
+      - type: must_be_empty
+
+  - categoria: "2.6"
+    code: "2.6.3"
+    descripcion: "List of SNMPv3 users "
+    cmd: "list sys snmp users | grep username | awk {'print $2'}"
+    api_path: "/mgmt/tm/sys/snmp/users"
+    campo: "username"
+    valor_recomendado: "Se debe tener al menos el user de SNMP de Pruebas"
+    policy:
+      - type: allow_any
+        values: ["pruebas"]
+
+  - categoria: "2.6"
+    code: "2.6.4"
+    descripcion: "Status of Log Access for Firewall Manager "
+    cmd: "list sys db ui.logaccess.firewallmanager | grep value | awk {'print $2'}"
+    api_path: "/mgmt/tm/sys/db/ui.logaccess.firewallmanager"
+    campo: "value"
+    valor_recomendado: "Se debe colocar como disable | modify sys db ui.logaccess.firewallmanager value disable"
+    policy:
+      - type: allow_any
+        values: ["disable"]
+
+  - categoria: "2.6"
+    code: "2.6.5"
+    descripcion: "Status of Log Access for Acceleration Policy Editor "
+    cmd: "list sys db ui.logaccess.accelartionpolicyeditor | grep value | awk {'print $2'}"
+    api_path: "/mgmt/tm/sys/db/ui.logaccess.accelartionpolicyeditor"
+    campo: "value"
+    valor_recomendado: "Se debe colocar como disable | modify sys db ui.logaccess.accelartionpolicyeditor  value disable"
+    policy:
+      - type: allow_any
+        values: ["disable"]
+
+  - categoria: "2.6"
+    code: "2.6.6"
+    descripcion: "Status of Log Access for Guest"
+    cmd: "list sys db ui.logaccess.guest | grep value | awk {'print $2'}"
+    api_path: "/mgmt/tm/sys/db/ui.logaccess.guest"
+    campo: "value"
+    valor_recomendado: "Se debe colocar como disable | modify sys db ui.logaccess.guest  value disable"
+    policy:
+      - type: allow_any
+        values: ["disable"]
+
+  - categoria: "2.6"
+    code: "2.6.7"
+    descripcion: "Status of Log Access for Operator"
+    cmd: "list sys db ui.logaccess.operator | grep value | awk {'print $2'}"
+    api_path: "/mgmt/tm/sys/db/ui.logaccess.operator"
+    campo: "value"
+    valor_recomendado: "Se debe colocar como disable | modify sys db ui.logaccess.operator value disable"
+    policy:
+      - type: allow_any
+        values: ["disable"]
+
+  - categoria: "2.6"
+    code: "2.6.8"
+    descripcion: "Status of Log Access for Application Editor"
+    cmd: "list sys db ui.logaccess.applicationeditor | grep value | awk {'print $2'}"
+    api_path: "/mgmt/tm/sys/db/ui.logaccess.applicationeditor"
+    campo: "value"
+    valor_recomendado: "Se debe colocar como disable | modify sys db ui.logaccess.applicationeditor  value disable"
+    policy:
+      - type: allow_any
+        values: ["disable"]
+
+  - categoria: "2.6"
+    code: "2.6.9"
+    descripcion: "Status of Log Access for Manager"
+    cmd: "list sys db ui.logaccess.manager | grep value | awk {'print $2'}"
+    api_path: "/mgmt/tm/sys/db/ui.logaccess.manager"
+    campo: "value"
+    valor_recomendado: "Se debe colocar como disable | modify sys db ui.logaccess.manager  value disable"
+    policy:
+      - type: allow_any
+        values: ["disable"]
+
+  - categoria: "2.6"
+    code: "2.6.10"
+    descripcion: "Status of Log Access for Irule Manager"
+    cmd: "list sys db ui.logaccess.irulemanager | grep value | awk {'print $2'}"
+    api_path: "/mgmt/tm/sys/db/ui.logaccess.irulemanager"
+    campo: "value"
+    valor_recomendado: "Se debe colocar como disable | modify sys db ui.logaccess.irulemanager  value disable"
+    policy:
+      - type: allow_any
+        values: ["disable"]
+
+  - categoria: "2.6"
+    code: "2.6.11"
+    descripcion: "Status of Log Access for Certificate Manager"
+    cmd: "list sys db ui.logaccess.certificatemanager | grep value | awk {'print $2'}"
+    api_path: "/mgmt/tm/sys/db/ui.logaccess.certificatemanager"
+    campo: "value"
+    valor_recomendado: "Se debe colocar como disable | modify sys db ui.logaccess.certificatemanager  value disable"
+    policy:
+      - type: allow_any
+        values: ["disable"]
+
+  - categoria: "2.6"
+    code: "2.6.12"
+    descripcion: "Status of Log Access for USer Manager"
+    cmd: "list sys db ui.logaccess.usermanager | grep value | awk {'print $2'}"
+    api_path: "/mgmt/tm/sys/db/ui.logaccess.usermanager"
+    campo: "value"
+    valor_recomendado: "Se debe colocar como disable | modify sys db ui.logaccess.usermanager  value disable"
+    policy:
+      - type: allow_any
+        values: ["disable"]
+
+  - categoria: "2.6"
+    code: "2.6.13"
+    descripcion: "Status od the MCP Audit Looging"
+    cmd: "list sys db config.auditing | grep value | awk {'print $2'}"
+    api_path: "/mgmt/tm/sys/db/config.auditing"
+    campo: "value"
+    valor_recomendado: "Se debe colocar como enable | modify sys db config.auditing value enable"
+    policy:
+      - type: allow_any
+        values: ["enable"]
+
+  - categoria: "2.6"
+    code: "2.6.14"
+    descripcion: "Status od the Gui Audit Looging"
+    cmd: "list sys global-settings gui-audit | grep gui-audit | awk {'print $2'}"
+    api_path: "/mgmt/tm/sys/global-settings"
+    campo: "guiAudit"
+    valor_recomendado: "Se debe colocar como enabled | modify sys global-settings gui-audit enabled"
+    policy:
+      - type: allow_any
+        values: ["enabled"]

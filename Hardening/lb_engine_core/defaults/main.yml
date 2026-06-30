@@ -1,0 +1,45 @@
+#SPDX-License-Identifier: MIT-0
+---
+# defaults file for lb_engine_core
+
+# Directorio de salida por country. Agregar entradas según los sitios disponibles.
+# Uso: ansible-playbook hardening.yml -e country=MX --ask-vault-pass
+_hardening_output_dirs:
+  MX: "/reportes/mx"
+  US: "/reportes/us"
+
+# Resuelve el directorio según country. Si country no está definido usa /pruebas.
+hardening_output_dir: "{{ _hardening_output_dirs[country] | default('/pruebas') }}"
+
+# ── Configuración de la F5 iControlREST API ──────────────────────────────────
+
+# Puerto HTTPS del iControlREST (siempre 443 en BIG-IP).
+f5_api_port: 443
+
+# Validación de certificado TLS.
+# false: adecuado para entornos de laboratorio con certs autofirmados.
+# true:  recomendado en producción. Requiere CA válida en el controller.
+#   Override: ansible-playbook hardening.yml -e f5_validate_certs=true
+f5_validate_certs: false
+
+# Duración del token tras el PATCH de extensión (segundos).
+# Default BIG-IP: 1200s (20 min). Máximo: 36000s (10 horas).
+f5_token_timeout: 7200     # 2 horas — aumentar si la auditoría tarda más (máx 36000)
+
+# Proveedor de autenticación iControlREST.
+# "tmos"  → cuentas locales del BIG-IP (admin, root)
+# Otros valores comunes: "ldap", "radius", o el nombre del auth-source configurado.
+# Verificar con: tmsh list auth source
+f5_auth_provider: "tmos"
+
+# Controla si lb_engine_core genera el CSV al finalizar.
+# Poner false cuando se invoca desde un playbook multi-perfil.
+lb_generate_csv: true
+
+# ── Integración con Django REST API ──────────────────────────────────────────
+# Activar con: -e lb_api_push=true -e lb_api_url=https://servidor-django
+lb_api_push: false
+lb_api_url: ""
+# Credenciales en vault (group_vars/all/vault.yml):
+#   lb_api_user: "ansible_service"
+#   lb_api_pass: "secret"

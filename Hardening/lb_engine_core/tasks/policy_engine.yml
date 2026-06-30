@@ -1,0 +1,77 @@
+---
+
+- name: "Resultado por defecto: passed para el check {{ item.code }}"
+  ansible.builtin.set_fact:
+    resultado: passed
+
+- name: "Evaluar Reglas"
+  ansible.builtin.set_fact:
+    resultado: failed
+  when: >
+    (
+      regla.get('type') == 'deny'
+      and (regla.get('values',[]) | select('in',valor_lista ) | list | length > 0 )
+    )
+    or
+    (
+      regla.get('type') == 'allow_any'
+      and (regla.get('values',[]) | select ('in',valor_lista) | list | length == 0)
+    )
+    or
+    (
+      regla.get('type') == 'not_empty'
+      and valor_lista | length == 0
+    )
+    or
+    (
+      regla.get('type') == 'numeric_gte'
+      and (valor_obtenido | int ) < (regla.get('value', 0) | int )
+    )
+    or
+    (
+      regla.get('type') == 'numeric_lte'
+      and (valor_obtenido | int ) > (regla.get('value', 0) | int )
+    )
+    or
+    (
+      regla.get('type') == 'numeric_eq'
+      and (valor_obtenido | int ) != (regla.get('value', 0) | int )
+    )
+    or
+    (
+      regla.get('type') == 'deny_contains'
+      and (valor_lista | select('search', regla.get('pattern', '(?!)')) | list | length > 0)
+    )
+    or
+    (
+      regla.get('type') == 'allow_only'
+      and (valor_lista | reject('in', regla.get('values', [])) | list | length > 0)
+    )
+    or
+    (
+      regla.get('type') == 'must_be_empty'
+      and valor_lista | length > 0
+    )
+    or
+    (
+      regla.get('type') == 'min_entry_count'
+      and (ntp_entries | length ) < (regla.get('value', 0) | int)
+    )
+    or
+    (
+      regla.get('type') == 'min_list_count'
+      and (valor_lista | length) < (regla.get('value', 0) | int)
+    )
+    or
+    (
+      regla.get('type') == 'must_contain_hostname'
+      and (inventory_hostname | lower) not in (valor_obtenido | lower)
+    )
+    or
+    (
+      regla.get('type') == 'cert_max_days_remaining'
+      and (valor_obtenido | int) - (now(True, '%s') | int) > (regla.get('value', 360) | int * 86400)
+    )
+  loop: "{{ item.policy | default([]) }}"
+  loop_control:
+    loop_var: regla

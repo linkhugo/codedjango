@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guía de Usuario — F5 BIG-IP Hardening</title>
+<style>
+  :root {
+    --red: #CC0000;
+    --dark: #1A1A1A;
+    --mid: #444;
+    --light: #F5F5F5;
+    --border: #DDDDDD;
+    --blue: #0060A9;
+    --green: #2E7D32;
+    --code-bg: #F0F0F0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; color: var(--dark); background: #fff; max-width: 860px; margin: 0 auto; padding: 2.5rem 2rem 4rem; }
+
+  /* Header */
+  .doc-header { border-left: 6px solid var(--red); padding: .6rem 1.2rem; margin-bottom: 2.5rem; background: var(--light); }
+  .doc-header h1 { font-size: 24px; color: var(--red); }
+  .doc-header p { color: #666; font-size: 13px; margin-top: .3rem; }
+
+  h2 { font-size: 17px; color: var(--red); margin: 2.5rem 0 .8rem; padding-bottom: .4rem; border-bottom: 2px solid var(--red); display: flex; align-items: center; gap: .5rem; }
+  h2 .num { background: var(--red); color: #fff; width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; }
+  h3 { font-size: 14px; color: var(--blue); margin: 1.4rem 0 .5rem; font-weight: 700; }
+  p { line-height: 1.65; margin-bottom: .8rem; color: var(--mid); }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0 1.5rem; font-size: 13px; }
+  th { background: var(--dark); color: #fff; padding: .55rem .8rem; text-align: left; font-weight: 600; font-size: 12px; }
+  td { padding: .5rem .8rem; border-bottom: 1px solid var(--border); vertical-align: top; line-height: 1.5; }
+  tr:nth-child(even) td { background: var(--light); }
+
+  /* Code */
+  code { font-family: 'Courier New', monospace; font-size: 12px; background: var(--code-bg); padding: .1rem .35rem; border-radius: 3px; color: #333; }
+  pre { background: var(--dark); color: #e8e8e8; border-radius: 6px; padding: 1rem 1.2rem; overflow-x: auto; font-size: 12.5px; line-height: 1.7; margin: .8rem 0 1.2rem; }
+  pre code { background: none; color: inherit; padding: 0; font-size: inherit; }
+  pre .comment { color: #6a9955; }
+  pre .flag { color: #9cdcfe; }
+  pre .value { color: #ce9178; }
+
+  /* Steps */
+  .steps { counter-reset: step; list-style: none; }
+  .steps li { counter-increment: step; display: flex; gap: 1rem; margin-bottom: 1.2rem; align-items: flex-start; }
+  .steps li::before { content: counter(step); background: var(--blue); color: #fff; width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .steps li div { flex: 1; }
+  .steps li div p { margin-bottom: .3rem; }
+
+  /* Boxes */
+  .info-box  { background: #E3F0FB; border-left: 4px solid var(--blue); padding: .8rem 1rem; margin: 1rem 0; border-radius: 0 4px 4px 0; font-size: 13px; color: var(--mid); }
+  .warn-box  { background: #FFF8E1; border-left: 4px solid #F9A825; padding: .8rem 1rem; margin: 1rem 0; border-radius: 0 4px 4px 0; font-size: 13px; color: var(--mid); }
+  .ok-box    { background: #E8F5E9; border-left: 4px solid var(--green); padding: .8rem 1rem; margin: 1rem 0; border-radius: 0 4px 4px 0; font-size: 13px; color: var(--mid); }
+
+  /* Badges */
+  .badge { display: inline-block; padding: .15rem .5rem; border-radius: 3px; font-size: 11px; font-weight: 700; }
+  .pass  { background: #E8F5E9; color: var(--green); }
+  .fail  { background: #FDECEA; color: var(--red); }
+  .info  { background: #E3F0FB; color: var(--blue); }
+
+  /* CSV row example */
+  .csv-example { overflow-x: auto; }
+  .csv-example table { min-width: 700px; }
+
+  @media print {
+    h2 { page-break-before: always; }
+    h2:first-of-type { page-break-before: avoid; }
+    .doc-header { page-break-before: avoid; }
+    pre, table { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<div class="doc-header">
+  <h1>Guía de Usuario</h1>
+  <p>F5 BIG-IP Hardening Framework — Cómo ejecutar y usar el playbook de auditoría</p>
+</div>
+
+<!-- ═══ 1. REQUISITOS ═══ -->
+<h2><span class="num">1</span> Requisitos Previos</h2>
+
+<table>
+  <tr><th>Requisito</th><th>Detalle</th></tr>
+  <tr><td>Ansible</td><td>Versión 2.10 o superior</td></tr>
+  <tr><td>Python</td><td>3.8 o superior (requerido por Ansible)</td></tr>
+  <tr><td>Colecciones Ansible</td><td>No se requieren colecciones externas (solo módulos built-in)</td></tr>
+  <tr><td>Acceso de red</td><td>HTTPS al puerto 443 del management IP de cada F5</td></tr>
+  <tr><td>Credenciales F5</td><td>Usuario con permisos de lectura (rol <em>Operator</em> o superior)</td></tr>
+  <tr><td>Sistema operativo</td><td>Linux o macOS en el controller (Windows con WSL2)</td></tr>
+</table>
+
+<div class="info-box">
+  <strong>Sin SSH al F5.</strong> El playbook realiza llamadas HTTPS a la API REST del dispositivo. No se requiere acceso SSH ni instalación de agentes en el F5.
+</div>
+
+<!-- ═══ 2. SETUP INICIAL ═══ -->
+<h2><span class="num">2</span> Setup Inicial</h2>
+
+<ul class="steps">
+  <li>
+    <div>
+      <p><strong>Clonar o descargar el proyecto</strong></p>
+      <pre><code>cd /ruta/deseada
+git clone &lt;repo-url&gt; Hardening
+cd Hardening</code></pre>
+    </div>
+  </li>
+  <li>
+    <div>
+      <p><strong>Configurar el inventario</strong> — Editar <code>inventory/hosts.ini</code> con los dispositivos F5:</p>
+      <pre><code>[f5_devices]
+f5-primary    ansible_host=<span class="value">10.0.0.10</span>   ansible_user=<span class="value">admin</span>   ansible_connection=local
+f5-secondary  ansible_host=<span class="value">10.0.0.11</span>   ansible_user=<span class="value">admin</span>   ansible_connection=local</code></pre>
+    </div>
+  </li>
+  <li>
+    <div>
+      <p><strong>Crear el archivo de credenciales</strong></p>
+      <pre><code><span class="comment"># Copiar la plantilla</span>
+cp inventory/group_vars/f5_devices.vault.yml.example \
+   inventory/group_vars/f5_devices.vault.yml
+
+<span class="comment"># Editar con el password real</span>
+nano inventory/group_vars/f5_devices.vault.yml</code></pre>
+      <p>El archivo debe contener:</p>
+      <pre><code>ansible_password: <span class="value">"TuPasswordAqui"</span></code></pre>
+    </div>
+  </li>
+  <li>
+    <div>
+      <p><strong>Cifrar el archivo de credenciales con ansible-vault</strong></p>
+      <pre><code>ansible-vault encrypt inventory/group_vars/f5_devices.vault.yml
+<span class="comment"># Se pedirá una contraseña de vault — guárdala en lugar seguro</span></code></pre>
+    </div>
+  </li>
+  <li>
+    <div>
+      <p><strong>Verificar conectividad</strong> antes de ejecutar el playbook completo</p>
+      <pre><code>ansible f5_devices -m uri \
+  -a "url=https://10.0.0.10/mgmt/shared/ping validate_certs=false" \
+  --ask-vault-pass</code></pre>
+      <p>Debe responder con <code>"ping": "pong"</code>.</p>
+    </div>
+  </li>
+</ul>
+
+<!-- ═══ 3. EJECUCIÓN ═══ -->
+<h2><span class="num">3</span> Cómo Ejecutar el Playbook</h2>
+
+<h3>Comandos frecuentes</h3>
+<table>
+  <tr><th>Comando</th><th>Descripción</th></tr>
+  <tr>
+    <td><code>ansible-playbook hardening.yml --ask-vault-pass</code></td>
+    <td>Auditoría completa con perfil CIS (hardening_v_1_5) en todos los dispositivos</td>
+  </tr>
+  <tr>
+    <td><code>ansible-playbook hardening.yml -e profile_name=network_services_std_values --ask-vault-pass</code></td>
+    <td>Auditoría con perfil NS_STD (Network Services Standards)</td>
+  </tr>
+  <tr>
+    <td><code>ansible-playbook combined_audit.yml --ask-vault-pass</code></td>
+    <td>Ambos perfiles en una sola ejecución → genera un CSV por dispositivo</td>
+  </tr>
+  <tr>
+    <td><code>ansible-playbook hardening.yml --limit f5-primary --ask-vault-pass</code></td>
+    <td>Auditar solo un dispositivo específico del inventario</td>
+  </tr>
+  <tr>
+    <td><code>ansible-playbook hardening.yml -e country=MX --ask-vault-pass</code></td>
+    <td>Usar directorio de salida configurado para México</td>
+  </tr>
+  <tr>
+    <td><code>ansible-playbook hardening.yml -e hardening_output_dir=/tmp/reportes --ask-vault-pass</code></td>
+    <td>Guardar el CSV en una ruta personalizada</td>
+  </tr>
+  <tr>
+    <td><code>ansible-playbook hardening.yml -e f5_validate_certs=true --ask-vault-pass</code></td>
+    <td>Producción: validar certificado TLS del F5</td>
+  </tr>
+  <tr>
+    <td><code>ansible-playbook hardening.yml -e lb_api_push=true -e lb_api_url=https://api.corp.com --ask-vault-pass</code></td>
+    <td>Ejecutar y enviar resultados a la API Django automáticamente</td>
+  </tr>
+</table>
+
+<div class="ok-box">
+  <strong>Tip:</strong> Para no tener que escribir <code>--ask-vault-pass</code> cada vez, puedes configurar la contraseña de vault en el archivo <code>~/.vault_pass</code> y agregar <code>vault_password_file = ~/.vault_pass</code> en <code>ansible.cfg</code>.
+</div>
+
+<!-- ═══ 4. PERFILES ═══ -->
+<h2><span class="num">4</span> Perfiles Disponibles</h2>
+
+<table>
+  <tr><th>Perfil</th><th>Archivo</th><th>Checks</th><th>Cuándo usar</th></tr>
+  <tr>
+    <td><strong>hardening_v_1_5</strong></td>
+    <td><code>lb_profiles/vars/hardening_v_1_5.yml</code></td>
+    <td>43 (CIS 2.1–2.6)</td>
+    <td>Auditoría de cumplimiento CIS Benchmark. Cubre controles de seguridad base: password policy, auth, SSH, HTTP, SNMP, logging.</td>
+  </tr>
+  <tr>
+    <td><strong>network_services_std_values</strong></td>
+    <td><code>lb_profiles/vars/network_services_std_values.yml</code></td>
+    <td>28 (NS_STD)</td>
+    <td>Controles de servicios de red: HA/failover, advisory banner, rutas, certificados, hostname, syslog, configuraciones operativas.</td>
+  </tr>
+  <tr>
+    <td><strong>combined_audit</strong></td>
+    <td><code>combined_audit.yml</code></td>
+    <td>71 (ambos)</td>
+    <td>Auditoría completa. Genera un solo CSV consolidado por dispositivo con todos los checks.</td>
+  </tr>
+</table>
+
+<!-- ═══ 5. INTERPRETAR RESULTADOS ═══ -->
+<h2><span class="num">5</span> Interpretar el Reporte CSV</h2>
+
+<h3>Columnas del CSV</h3>
+<table>
+  <tr><th>Columna</th><th>Descripción</th><th>Ejemplo</th></tr>
+  <tr><td><code>Device</code></td><td>Nombre del dispositivo en el inventario</td><td>f5-primary</td></tr>
+  <tr><td><code>Code</code></td><td>Identificador único del check</td><td>2.1.1 / NS_STD_004</td></tr>
+  <tr><td><code>Descripcion</code></td><td>Qué verifica este check</td><td>Status minimum length</td></tr>
+  <tr><td><code>Valor_Obtenido</code></td><td>Valor actual en el dispositivo</td><td>15 / enabled / ERROR_404</td></tr>
+  <tr><td><code>Valor_Recomendado</code></td><td>Valor esperado + comando de remediación</td><td>Valor igual a 15 | modify auth...</td></tr>
+  <tr><td><code>Resultado</code></td><td><span class="badge pass">passed</span> o <span class="badge fail">failed</span></td><td>passed</td></tr>
+  <tr><td><code>Comando_Para_Validar</code></td><td>Comando tmsh para verificar manualmente</td><td>list auth password-policy minimum-length</td></tr>
+  <tr><td><code>fecha</code></td><td>Fecha de ejecución</td><td>2026-04-23</td></tr>
+</table>
+
+<h3>Valores especiales en Valor_Obtenido</h3>
+<table>
+  <tr><th>Valor</th><th>Significa</th><th>Acción</th></tr>
+  <tr><td><code>ERROR_404</code></td><td>El objeto no existe en el F5</td><td>Crear el objeto recomendado</td></tr>
+  <tr><td><code>ERROR_403</code></td><td>Sin permisos para consultar ese endpoint</td><td>Verificar rol del usuario de auditoría</td></tr>
+  <tr><td><code>ERROR_CONN</code></td><td>No se pudo conectar al dispositivo</td><td>Verificar red y puerto 443</td></tr>
+  <tr><td><code>missing:{keyword}</code></td><td>La línea esperada no existe en la respuesta</td><td>Configurar el parámetro indicado</td></tr>
+  <tr><td>Valor en minúsculas</td><td>Valor real del dispositivo (normalizado)</td><td>Comparar con Valor_Recomendado</td></tr>
+</table>
+
+<h3>Ejemplo de fila en el CSV</h3>
+<div class="csv-example">
+<table>
+  <tr><th>Device</th><th>Code</th><th>Descripcion</th><th>Valor_Obtenido</th><th>Resultado</th></tr>
+  <tr><td>f5-primary</td><td>2.1.1</td><td>Status Policy</td><td>enabled</td><td><span class="badge pass">passed</span></td></tr>
+  <tr><td>f5-primary</td><td>2.1.2</td><td>Status minimum length</td><td>6</td><td><span class="badge fail">failed</span></td></tr>
+  <tr><td>f5-primary</td><td>NS_STD_004</td><td>Existencia Device Group HA</td><td>ERROR_404</td><td><span class="badge fail">failed</span></td></tr>
+  <tr><td>f5-primary</td><td>NS_STD_018</td><td>VLAN Failsafe habilitado</td><td>enabled</td><td><span class="badge pass">passed</span></td></tr>
+</table>
+</div>
+
+<!-- ═══ 6. OPCIONES ═══ -->
+<h2><span class="num">6</span> Variables de Ejecución (<code>-e</code>)</h2>
+
+<table>
+  <tr><th>Variable</th><th>Default</th><th>Descripción</th></tr>
+  <tr><td><code>profile_name</code></td><td>hardening_v_1_5</td><td>Perfil de checks a usar</td></tr>
+  <tr><td><code>hardening_output_dir</code></td><td>/pruebas</td><td>Directorio donde se guarda el CSV</td></tr>
+  <tr><td><code>country</code></td><td>—</td><td>País para seleccionar directorio predefinido (MX, US)</td></tr>
+  <tr><td><code>f5_validate_certs</code></td><td>false</td><td>Validar certificado TLS del F5 (true en producción)</td></tr>
+  <tr><td><code>f5_token_timeout</code></td><td>7200</td><td>Duración del token de sesión en segundos</td></tr>
+  <tr><td><code>lb_api_push</code></td><td>false</td><td>Enviar resultados a API Django</td></tr>
+  <tr><td><code>lb_api_url</code></td><td>—</td><td>URL base de la API Django (requerida si lb_api_push=true)</td></tr>
+</table>
+
+<!-- ═══ 7. TROUBLESHOOTING ═══ -->
+<h2><span class="num">7</span> Resolución de Problemas</h2>
+
+<table>
+  <tr><th>Síntoma</th><th>Causa probable</th><th>Solución</th></tr>
+  <tr>
+    <td><code>ERROR_CONN</code> en todos los checks</td>
+    <td>No hay conectividad al F5 en puerto 443</td>
+    <td>Verificar firewall, VPN y que el ansible_host sea correcto</td>
+  </tr>
+  <tr>
+    <td><code>ERROR_403</code> en checks</td>
+    <td>El usuario no tiene permisos suficientes</td>
+    <td>Asignar rol <em>Operator</em> o superior en el F5</td>
+  </tr>
+  <tr>
+    <td>Token inválido / expirado</td>
+    <td>El playbook tardó más que <code>f5_token_timeout</code></td>
+    <td>Aumentar <code>f5_token_timeout</code> (máx F5: 36000 seg)</td>
+  </tr>
+  <tr>
+    <td>Error de vault al ejecutar</td>
+    <td>Contraseña de vault incorrecta o archivo no cifrado</td>
+    <td>Verificar con <code>ansible-vault view inventory/group_vars/f5_devices.vault.yml</code></td>
+  </tr>
+  <tr>
+    <td>CSV vacío o no generado</td>
+    <td>El directorio de salida no existe o sin permisos</td>
+    <td>Crear el directorio o usar <code>-e hardening_output_dir=/tmp</code></td>
+  </tr>
+  <tr>
+    <td>Checks SSH fallan con <code>missing:KexAlgorithms</code></td>
+    <td>El campo <code>include</code> del SSHD está vacío en el F5</td>
+    <td>Configurar <code>sys sshd include</code> con los algoritmos requeridos</td>
+  </tr>
+  <tr>
+    <td>2.6.3 falla aunque el usuario SNMP exista</td>
+    <td>El nombre del usuario tiene capitalización diferente</td>
+    <td>El check usa la colección <code>/mgmt/tm/sys/snmp/users</code> — verificar que el campo <code>username</code> tenga el valor "pruebas" (cualquier capitalización es válida)</td>
+  </tr>
+  <tr>
+    <td>NS_STD_029 siempre falla</td>
+    <td>El certificado <code>server.crt</code> es el auto-firmado de F5 sin hostname correcto</td>
+    <td>Instalar un certificado firmado con el CN igual al hostname del dispositivo</td>
+  </tr>
+  <tr>
+    <td>Playbook muy lento</td>
+    <td>Muchos dispositivos en el inventario</td>
+    <td>Usar <code>--limit</code> para auditar por lotes, o aumentar <code>[ssh_connection] pipelining = True</code> en ansible.cfg</td>
+  </tr>
+</table>
+
+<div class="warn-box">
+  <strong>Nota sobre certificados TLS:</strong> En entornos de laboratorio con certificados auto-firmados, mantener <code>f5_validate_certs: false</code>. En producción, usar <code>-e f5_validate_certs=true</code> y asegurarse de que la CA del F5 esté en el trust store del controller.
+</div>
+
+<p style="margin-top:3rem;color:#999;font-size:12px;text-align:center">
+  F5 BIG-IP Hardening Framework · Guía de Usuario · Generado: 2026-04-23
+</p>
+</body>
+</html>

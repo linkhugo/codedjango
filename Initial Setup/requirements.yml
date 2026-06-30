@@ -1,0 +1,9 @@
+---
+# requirements.yml — Dependencias de colecciones Ansible
+#
+# Instalar con:
+#   ansible-galaxy collection install -r requirements.yml
+
+collections:
+  - name: f5networks.f5_modules
+    version: ">=1.20.0"

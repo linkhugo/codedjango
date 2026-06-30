@@ -1,0 +1,16 @@
+---
+# F5 BIG-IP Hardening Audit
+#
+# Uso:
+#   ansible-playbook hardening.yml --ask-vault-pass
+#
+# Opciones:
+#   Perfil alternativo:       -e profile_name=hardening_v_2_0
+#   Directorio de salida:     -e hardening_output_dir=/tmp/reportes
+#   Limitar a un host:        -l test01
+
+- hosts: f5_devices
+  gather_facts: no
+
+  roles:
+    - lb_profiles

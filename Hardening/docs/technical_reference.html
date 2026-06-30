@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Referencia Técnica — F5 BIG-IP Hardening Framework</title>
+<style>
+  :root {
+    --red: #CC0000;
+    --dark: #1A1A1A;
+    --mid: #444;
+    --light: #F5F5F5;
+    --border: #DDDDDD;
+    --blue: #0060A9;
+    --green: #2E7D32;
+    --code-bg: #F0F0F0;
+    --sidebar-w: 240px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; color: var(--dark); background: #fff; }
+
+  /* ── Sidebar ── */
+  #sidebar {
+    position: fixed; top: 0; left: 0; width: var(--sidebar-w);
+    height: 100vh; background: var(--dark); color: #fff;
+    overflow-y: auto; padding: 0 0 2rem 0; z-index: 100;
+  }
+  #sidebar .logo { background: var(--red); padding: 1rem 1.2rem; font-size: 13px; font-weight: 700; letter-spacing: .5px; }
+  #sidebar .logo span { display: block; font-size: 10px; font-weight: 400; opacity: .8; margin-top: 2px; }
+  #sidebar nav a {
+    display: block; padding: .45rem 1.2rem; color: #ccc; text-decoration: none;
+    font-size: 12.5px; border-left: 3px solid transparent; transition: all .15s;
+  }
+  #sidebar nav a:hover, #sidebar nav a.active { color: #fff; border-left-color: var(--red); background: rgba(255,255,255,.06); }
+  #sidebar nav .section-label { padding: .7rem 1.2rem .2rem; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #666; }
+
+  /* ── Main content ── */
+  #main { margin-left: var(--sidebar-w); padding: 2.5rem 3rem; max-width: 960px; }
+  h1 { font-size: 26px; color: var(--red); margin-bottom: .3rem; }
+  h2 { font-size: 18px; color: var(--red); margin: 2.5rem 0 .8rem; padding-bottom: .4rem; border-bottom: 2px solid var(--red); }
+  h3 { font-size: 14px; color: var(--blue); margin: 1.5rem 0 .5rem; font-weight: 700; }
+  h4 { font-size: 13px; color: var(--mid); margin: 1rem 0 .4rem; font-weight: 600; }
+  p { line-height: 1.6; margin-bottom: .8rem; color: var(--mid); }
+  .subtitle { font-size: 13px; color: #666; margin-bottom: 1.5rem; }
+
+  /* ── Tables ── */
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0 1.5rem; font-size: 13px; }
+  th { background: var(--dark); color: #fff; padding: .55rem .8rem; text-align: left; font-weight: 600; font-size: 12px; }
+  td { padding: .5rem .8rem; border-bottom: 1px solid var(--border); vertical-align: top; line-height: 1.5; }
+  tr:nth-child(even) td { background: var(--light); }
+  tr:hover td { background: #EEF4FB; }
+
+  /* ── Code ── */
+  code { font-family: 'Courier New', monospace; font-size: 12px; background: var(--code-bg); padding: .1rem .35rem; border-radius: 3px; color: #333; }
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 5px; padding: 1rem 1.2rem; overflow-x: auto; font-size: 12.5px; line-height: 1.6; margin: .8rem 0 1.2rem; }
+  pre code { background: none; padding: 0; }
+
+  /* ── Badges ── */
+  .badge { display: inline-block; padding: .15rem .5rem; border-radius: 3px; font-size: 11px; font-weight: 600; }
+  .badge-blue { background: #E3F0FB; color: var(--blue); }
+  .badge-green { background: #E8F5E9; color: var(--green); }
+  .badge-red { background: #FDECEA; color: var(--red); }
+  .badge-gray { background: #EEEEEE; color: #555; }
+
+  /* ── Flow diagram ── */
+  .flow { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem; margin: 1rem 0 1.5rem; }
+  .flow-box { background: var(--blue); color: #fff; padding: .4rem .9rem; border-radius: 4px; font-size: 12px; font-weight: 600; }
+  .flow-box.red { background: var(--red); }
+  .flow-box.green { background: var(--green); }
+  .flow-box.gray { background: #555; }
+  .flow-arrow { color: #999; font-size: 18px; }
+
+  /* ── Info box ── */
+  .info-box { background: #E3F0FB; border-left: 4px solid var(--blue); padding: .8rem 1rem; margin: 1rem 0; border-radius: 0 4px 4px 0; font-size: 13px; color: var(--mid); }
+  .warn-box  { background: #FFF8E1; border-left: 4px solid #F9A825; padding: .8rem 1rem; margin: 1rem 0; border-radius: 0 4px 4px 0; font-size: 13px; color: var(--mid); }
+
+  /* ── Print ── */
+  @media print {
+    #sidebar { display: none; }
+    #main { margin-left: 0; padding: 1rem 2rem; }
+    h2 { page-break-before: always; }
+    h2:first-of-type { page-break-before: avoid; }
+    pre, table { page-break-inside: avoid; }
+    a { color: inherit; text-decoration: none; }
+  }
+</style>
+</head>
+<body>
+
+<aside id="sidebar">
+  <div class="logo">F5 Hardening<span>Referencia Técnica</span></div>
+  <nav>
+    <div class="section-label">Introducción</div>
+    <a href="#overview">Resumen del Proyecto</a>
+    <a href="#architecture">Arquitectura</a>
+    <a href="#files">Estructura de Archivos</a>
+
+    <div class="section-label">Engine</div>
+    <a href="#flow">Flujo de Ejecución</a>
+    <a href="#get_token">get_token.yml</a>
+    <a href="#execute_action">execute_action.yml</a>
+    <a href="#policy_engine">policy_engine.yml</a>
+    <a href="#revoke_token">revoke_token.yml</a>
+    <a href="#push_api">push_to_api.yml</a>
+
+    <div class="section-label">Referencia</div>
+    <a href="#variables">Variables</a>
+    <a href="#policy_types">Tipos de Policy</a>
+    <a href="#check_schema">Schema de Check</a>
+    <a href="#endpoints">Endpoints iControlREST</a>
+    <a href="#output">Output CSV</a>
+    <a href="#security">Seguridad</a>
+  </nav>
+</aside>
+
+<main id="main">
+  <h1>Referencia Técnica</h1>
+  <p class="subtitle">F5 BIG-IP Hardening &amp; Compliance Framework — Ansible + iControlREST</p>
+
+  <!-- ═══════════════════════════════ OVERVIEW ═══════════════════════════════ -->
+  <h2 id="overview">Resumen del Proyecto</h2>
+  <p>Framework de auditoría y cumplimiento para dispositivos <strong>F5 BIG-IP</strong> basado en el CIS Benchmark (categorías 2.1–2.6) y controles de red estándar (NS_STD). Ejecuta checks de configuración vía la API REST de F5 (iControlREST) sin requerir acceso SSH al dispositivo, y genera reportes CSV automatizados.</p>
+
+  <table>
+    <tr><th>Atributo</th><th>Valor</th></tr>
+    <tr><td>Plataforma destino</td><td>F5 BIG-IP TMOS (cualquier versión con iControlREST)</td></tr>
+    <tr><td>Ansible mínimo</td><td>2.10</td></tr>
+    <tr><td>Conexión al dispositivo</td><td>HTTPS puerto 443 (no SSH)</td></tr>
+    <tr><td>Autenticación</td><td>iControlREST token (POST /mgmt/shared/authn/login)</td></tr>
+    <tr><td>Perfiles disponibles</td><td>hardening_v_1_5 (CIS), network_services_std_values (NS_STD)</td></tr>
+    <tr><td>Output</td><td>CSV por dispositivo + push opcional a API Django</td></tr>
+    <tr><td>Checks totales</td><td>43 CIS + 28 NS_STD = 71 checks</td></tr>
+  </table>
+
+  <!-- ═══════════════════════════════ ARCHITECTURE ═══════════════════════════════ -->
+  <h2 id="architecture">Arquitectura</h2>
+  <div class="info-box">
+    <strong>Sin SSH.</strong> Todas las tareas se ejecutan en el <strong>Ansible Controller</strong>. El F5 nunca recibe una conexión SSH — solo responde a llamadas HTTPS a su API REST. La variable <code>ansible_connection: local</code> en el inventario garantiza este comportamiento.
+  </div>
+
+  <h3>Modelo de conexión</h3>
+  <pre>
+┌─────────────────────────────────┐         ┌──────────────────────────┐
+│       Ansible Controller        │  HTTPS  │     F5 BIG-IP Device     │
+│  (localhost / CI server)        │◄───────►│  iControlREST API :443   │
+│                                 │         │  /mgmt/tm/...            │
+│  lb_profiles role               │         │  /mgmt/shared/authn/...  │
+│    └─► lb_engine_core role      │         │                          │
+│         └─► execute_action.yml  │         │  No SSH required         │
+│              ansible.builtin.uri│         └──────────────────────────┘
+└─────────────────────────────────┘
+  </pre>
+
+  <!-- ═══════════════════════════════ FILES ═══════════════════════════════ -->
+  <h2 id="files">Estructura de Archivos</h2>
+  <pre>
+Hardening/
+├── hardening.yml              # Playbook principal (un perfil)
+├── combined_audit.yml         # Playbook combinado (ambos perfiles → 1 CSV)
+├── ansible.cfg                # Configuración Ansible
+├── inventory/
+│   ├── hosts.ini              # Inventario de dispositivos F5
+│   └── group_vars/
+│       ├── f5_devices.yml     # Variables de grupo (provider dict)
+│       └── f5_devices.vault.yml  # Credenciales cifradas (ansible-vault)
+│
+├── lb_profiles/               # ROL: cargador de perfiles
+│   ├── defaults/main.yml      # profile_name, lb_user, lb_pass
+│   ├── tasks/main.yml         # Include perfil + incluye lb_engine_core
+│   ├── vars/
+│   │   ├── hardening_v_1_5.yml          # 43 checks CIS 2.1–2.6
+│   │   └── network_services_std_values.yml  # 28 checks NS_STD
+│   └── meta/main.yml
+│
+└── lb_engine_core/            # ROL: motor de ejecución
+    ├── defaults/main.yml      # Variables de conexión y output
+    ├── meta/main.yml
+    └── tasks/
+        ├── main.yml           # Orquestador principal
+        ├── get_token.yml      # Login iControlREST
+        ├── run_categoria.yml  # Filtro por categoría
+        ├── execute_action.yml # Consulta API + extracción de campo
+        ├── policy_engine.yml  # Evaluación de reglas
+        ├── revoke_token.yml   # Logout iControlREST
+        └── push_to_api.yml    # Push opcional a Django
+  </pre>
+
+  <!-- ═══════════════════════════════ FLOW ═══════════════════════════════ -->
+  <h2 id="flow">Flujo de Ejecución</h2>
+
+  <div class="flow">
+    <div class="flow-box">main.yml</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-box green">get_token.yml</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-box">loop categorías</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-box">run_categoria.yml</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-box">execute_action.yml</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-box">policy_engine.yml</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-box red">revoke_token.yml</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-box gray">CSV / Django Push</div>
+  </div>
+
+  <table>
+    <tr><th>Paso</th><th>Archivo</th><th>Descripción</th></tr>
+    <tr><td>1</td><td><code>main.yml</code></td><td>Inicializa <code>resultados: []</code>, extrae categorías únicas del catálogo</td></tr>
+    <tr><td>2</td><td><code>get_token.yml</code></td><td>POST login → obtiene token; PATCH extiende timeout a <code>f5_token_timeout</code></td></tr>
+    <tr><td>3</td><td><code>run_categoria.yml</code></td><td>Filtra checks por categoría actual, hace loop hacia execute_action.yml</td></tr>
+    <tr><td>4</td><td><code>execute_action.yml</code></td><td>GET API → extrae campo → tokeniza → evalúa policy → acumula resultado</td></tr>
+    <tr><td>5</td><td><code>policy_engine.yml</code></td><td>Evalúa cada regla; si alguna falla → <code>resultado = failed</code></td></tr>
+    <tr><td>6</td><td><code>revoke_token.yml</code></td><td>DELETE token (bloque <code>always:</code> — se ejecuta aunque falle un check)</td></tr>
+    <tr><td>7</td><td><code>main.yml</code></td><td>Genera CSV en el controller; opcionalmente hace push a Django</td></tr>
+  </table>
+
+  <!-- ═══════════════════════════════ GET TOKEN ═══════════════════════════════ -->
+  <h2 id="get_token">get_token.yml — Autenticación</h2>
+  <p>Obtiene un token de sesión de iControlREST y extiende su duración.</p>
+  <table>
+    <tr><th>Paso</th><th>Método</th><th>Endpoint</th><th>Datos</th></tr>
+    <tr><td>Login</td><td>POST</td><td><code>/mgmt/shared/authn/login</code></td><td><code>username, password, loginProviderName</code></td></tr>
+    <tr><td>Extender</td><td>PATCH</td><td><code>/mgmt/shared/authz/tokens/{token}</code></td><td><code>timeout: f5_token_timeout</code></td></tr>
+  </table>
+  <p>El token se almacena en el fact <code>f5_api_token</code> (marcado <code>no_log: true</code>) y se usa como header <code>X-F5-Auth-Token</code> en todas las llamadas siguientes.</p>
+
+  <!-- ═══════════════════════════════ EXECUTE ACTION ═══════════════════════════════ -->
+  <h2 id="execute_action">execute_action.yml — Consulta y Extracción</h2>
+  <p>Para cada check, realiza una llamada GET a <code>item.api_path</code> y extrae el valor del campo <code>item.campo</code>.</p>
+
+  <h3>Lógica de extracción de campo</h3>
+  <ol style="margin-left:1.5rem;line-height:2">
+    <li>Si la respuesta contiene <code>items[]</code> (colección), itera sobre cada objeto</li>
+    <li>Navega la ruta dot-separated de <code>campo</code> (ej: <code>parent.child</code>)</li>
+    <li>Convierte todo a <strong>minúsculas</strong> y une con espacios → <code>valor_raw</code></li>
+    <li>Si <code>display_keyword</code> está definido: extrae la línea que contiene la keyword y toma el valor tras ella</li>
+    <li>Si <code>display_line</code> está definido: toma la línea completa que coincide</li>
+    <li>Tokeniza: divide por espacios/comas → <code>valor_lista</code></li>
+  </ol>
+
+  <h3>Manejo de errores API</h3>
+  <table>
+    <tr><th>Condición</th><th>valor_raw resultante</th></tr>
+    <tr><td>Conexión fallida</td><td><code>ERROR_CONN</code></td></tr>
+    <tr><td>HTTP 404</td><td><code>ERROR_404</code></td></tr>
+    <tr><td>HTTP 403</td><td><code>ERROR_403</code></td></tr>
+    <tr><td>Keyword no encontrada</td><td><code>missing:{keyword}</code></td></tr>
+  </table>
+  <p>Los errores de API no abortan el playbook (<code>ignore_errors: true</code>). El check se marca como <code>failed</code> automáticamente si el valor contiene <code>ERROR_</code>.</p>
+
+  <!-- ═══════════════════════════════ POLICY ENGINE ═══════════════════════════════ -->
+  <h2 id="policy_engine">policy_engine.yml — Evaluación de Reglas</h2>
+  <p>Evalúa la lista de reglas del check. Por defecto el resultado es <code>passed</code>; si <em>alguna</em> regla falla, cambia a <code>failed</code>. Múltiples reglas actúan como <strong>AND</strong> (todas deben pasar).</p>
+
+  <table>
+    <tr><th>Tipo</th><th>Falla cuando…</th><th>Parámetros</th></tr>
+    <tr><td><code>allow_any</code></td><td>Ningún valor de <code>values</code> aparece en <code>valor_lista</code></td><td><code>values: [...]</code></td></tr>
+    <tr><td><code>deny</code></td><td>Algún token de <code>values</code> aparece en <code>valor_lista</code></td><td><code>values: [...]</code></td></tr>
+    <tr><td><code>deny_contains</code></td><td>Algún token coincide con el regex <code>pattern</code></td><td><code>pattern: "sha1|md5"</code></td></tr>
+    <tr><td><code>not_empty</code></td><td><code>valor_lista</code> está vacío</td><td>—</td></tr>
+    <tr><td><code>must_be_empty</code></td><td><code>valor_lista</code> tiene elementos</td><td>—</td></tr>
+    <tr><td><code>allow_only</code></td><td>Algún token <strong>no</strong> está en <code>values</code></td><td><code>values: [...]</code></td></tr>
+    <tr><td><code>numeric_gte</code></td><td>Valor numérico &lt; umbral</td><td><code>value: N</code></td></tr>
+    <tr><td><code>numeric_lte</code></td><td>Valor numérico &gt; umbral</td><td><code>value: N</code></td></tr>
+    <tr><td><code>numeric_eq</code></td><td>Valor numérico ≠ umbral</td><td><code>value: N</code></td></tr>
+    <tr><td><code>min_entry_count</code></td><td>Conteo de entradas NTP &lt; umbral</td><td><code>value: N</code></td></tr>
+    <tr><td><code>min_list_count</code></td><td>Longitud de <code>valor_lista</code> &lt; umbral</td><td><code>value: N</code></td></tr>
+    <tr><td><code>must_contain_hostname</code></td><td><code>inventory_hostname</code> no está en <code>valor_obtenido</code></td><td>—</td></tr>
+    <tr><td><code>cert_max_days_remaining</code></td><td><code>expirationDate</code> - now &gt; (N × 86400) segundos</td><td><code>value: días</code></td></tr>
+  </table>
+
+  <!-- ═══════════════════════════════ REVOKE TOKEN ═══════════════════════════════ -->
+  <h2 id="revoke_token">revoke_token.yml — Logout</h2>
+  <p>Se ejecuta en el bloque <code>always:</code> de <code>main.yml</code>, garantizando que el token se revoca incluso si un check falla a mitad de la ejecución.</p>
+  <table>
+    <tr><th>Método</th><th>Endpoint</th><th>Status aceptados</th></tr>
+    <tr><td>DELETE</td><td><code>/mgmt/shared/authz/tokens/{f5_api_token}</code></td><td>200 (éxito), 404 (token ya expirado)</td></tr>
+  </table>
+  <div class="warn-box">El guard <code>when: f5_api_token is defined</code> protege contra el caso en que <code>get_token.yml</code> haya fallado y el token nunca se obtuvo.</div>
+
+  <!-- ═══════════════════════════════ PUSH API ═══════════════════════════════ -->
+  <h2 id="push_api">push_to_api.yml — Integración Django</h2>
+  <p>Función opcional activada con <code>-e lb_api_push=true</code>. Envía cada resultado a una API Django REST.</p>
+  <table>
+    <tr><th>Paso</th><th>Endpoint</th><th>Descripción</th></tr>
+    <tr><td>1. Login</td><td><code>POST /api/v1/token/</code></td><td>Obtiene JWT Bearer token</td></tr>
+    <tr><td>2. Push</td><td><code>POST /api/v1/hardening/checks/</code></td><td>Un POST por cada check (body: device, code, resultado, fecha…)</td></tr>
+  </table>
+  <p>Requiere: <code>lb_api_url</code>, <code>lb_api_user</code>, <code>lb_api_pass</code> (los últimos dos en vault).</p>
+
+  <!-- ═══════════════════════════════ VARIABLES ═══════════════════════════════ -->
+  <h2 id="variables">Variables</h2>
+
+  <h3>lb_engine_core/defaults/main.yml</h3>
+  <table>
+    <tr><th>Variable</th><th>Default</th><th>Descripción</th></tr>
+    <tr><td><code>f5_api_port</code></td><td>443</td><td>Puerto HTTPS del API iControlREST</td></tr>
+    <tr><td><code>f5_validate_certs</code></td><td>false</td><td>Validar certificado TLS del F5 (true en producción)</td></tr>
+    <tr><td><code>f5_token_timeout</code></td><td>7200</td><td>Duración del token en segundos (máx F5: 36000)</td></tr>
+    <tr><td><code>f5_auth_provider</code></td><td>tmos</td><td>Proveedor de auth: tmos (local), ldap, radius, etc.</td></tr>
+    <tr><td><code>hardening_output_dir</code></td><td>/pruebas</td><td>Directorio de salida del CSV en el controller</td></tr>
+    <tr><td><code>lb_generate_csv</code></td><td>true</td><td>Generar CSV al finalizar (false en multi-perfil)</td></tr>
+    <tr><td><code>lb_api_push</code></td><td>false</td><td>Enviar resultados a API Django</td></tr>
+    <tr><td><code>lb_api_url</code></td><td>""</td><td>URL base de la API Django</td></tr>
+  </table>
+
+  <h3>lb_profiles/defaults/main.yml</h3>
+  <table>
+    <tr><th>Variable</th><th>Default</th><th>Descripción</th></tr>
+    <tr><td><code>profile_name</code></td><td>hardening_v_1_5</td><td>Nombre del archivo de perfil (sin .yml)</td></tr>
+    <tr><td><code>lb_user</code></td><td>{{ provider.user }}</td><td>Usuario admin del F5</td></tr>
+    <tr><td><code>lb_pass</code></td><td>{{ provider.password }}</td><td>Password del F5 (de vault)</td></tr>
+  </table>
+
+  <h3>Runtime Facts (generados durante ejecución)</h3>
+  <table>
+    <tr><th>Fact</th><th>Tipo</th><th>Descripción</th></tr>
+    <tr><td><code>fecha_actual</code></td><td>string</td><td>Fecha YYYY-MM-DD para el CSV</td></tr>
+    <tr><td><code>resultados</code></td><td>lista</td><td>Acumulador de resultados de todos los checks</td></tr>
+    <tr><td><code>categorias</code></td><td>lista</td><td>Categorías únicas extraídas del catálogo</td></tr>
+    <tr><td><code>f5_api_token</code></td><td>string</td><td>Token de sesión iControlREST (no_log)</td></tr>
+    <tr><td><code>valor_raw</code></td><td>string</td><td>Valor extraído de la API (normalizado)</td></tr>
+    <tr><td><code>valor_lista</code></td><td>lista</td><td>Tokens del valor extraído</td></tr>
+    <tr><td><code>valor_obtenido</code></td><td>string</td><td>Valor final para mostrar en reporte</td></tr>
+    <tr><td><code>resultado</code></td><td>string</td><td>passed / failed para el check actual</td></tr>
+  </table>
+
+  <!-- ═══════════════════════════════ POLICY TYPES ═══════════════════════════════ -->
+  <h2 id="policy_types">Schema de un Check</h2>
+  <pre><code>checks:
+  - categoria: "2.1"              # Agrupación (visible en reporte)
+    code: "2.1.1"                 # Identificador único (clave en CSV)
+    descripcion: "Status Policy"  # Descripción legible
+    cmd: "list auth password-policy ..."  # Referencia tmsh (solo informativo)
+    api_path: "/mgmt/tm/auth/password-policy"  # Endpoint GET iControlREST
+    campo: "policyEnforcement"    # Clave JSON a extraer (dot-path soportado)
+    valor_recomendado: "enabled | modify auth password-policy ..."
+
+    # Opcionales — para respuestas multi-línea (ej: sshd include)
+    display_keyword: "KexAlgorithms"   # Extrae valor tras esta keyword en la línea
+    display_line: "FileETag"           # Extrae línea completa que coincida
+
+    policy:
+      - type: allow_any
+        values: ["enabled"]
+      - type: numeric_gte
+        value: 15</code></pre>
+
+  <!-- ═══════════════════════════════ ENDPOINTS ═══════════════════════════════ -->
+  <h2 id="endpoints">Endpoints iControlREST Utilizados</h2>
+  <h3>Perfil hardening_v_1_5</h3>
+  <table>
+    <tr><th>Endpoint</th><th>Checks</th></tr>
+    <tr><td><code>/mgmt/tm/auth/password-policy</code></td><td>2.1.1 – 2.1.6</td></tr>
+    <tr><td><code>/mgmt/tm/auth/source</code></td><td>2.2.1, 2.2.3</td></tr>
+    <tr><td><code>/mgmt/tm/auth/ldap</code></td><td>2.2.2</td></tr>
+    <tr><td><code>/mgmt/tm/auth/remote-user</code></td><td>2.2.4, 2.2.5</td></tr>
+    <tr><td><code>/mgmt/tm/sys/httpd</code></td><td>2.3.1, 2.3.2, 2.3.3, 2.5.2</td></tr>
+    <tr><td><code>/mgmt/tm/sys/sshd</code></td><td>2.4.1 – 2.4.9</td></tr>
+    <tr><td><code>/mgmt/tm/cli/global-settings</code></td><td>2.4.4</td></tr>
+    <tr><td><code>/mgmt/tm/sys/global-settings</code></td><td>2.4.5, 2.6.14</td></tr>
+    <tr><td><code>/mgmt/tm/sys/ntp</code></td><td>2.5.1</td></tr>
+    <tr><td><code>/mgmt/tm/net/self</code></td><td>2.5.3</td></tr>
+    <tr><td><code>/mgmt/tm/sys/service/named/stats/</code></td><td>2.5.4</td></tr>
+    <tr><td><code>/mgmt/tm/sys/snmp</code></td><td>2.6.1, 2.6.2.1, 2.6.2.2, 2.6.2</td></tr>
+    <tr><td><code>/mgmt/tm/sys/snmp/users</code></td><td>2.6.3</td></tr>
+    <tr><td><code>/mgmt/tm/sys/db/ui.logaccess.*</code></td><td>2.6.4 – 2.6.12</td></tr>
+    <tr><td><code>/mgmt/tm/sys/db/config.auditing</code></td><td>2.6.13</td></tr>
+  </table>
+
+  <h3>Perfil network_services_std_values</h3>
+  <table>
+    <tr><th>Endpoint</th><th>Checks</th></tr>
+    <tr><td><code>/mgmt/tm/sys/db/ui.advisory.*</code></td><td>NS_STD_001, NS_STD_002</td></tr>
+    <tr><td><code>/mgmt/tm/sys/db/ui.system.preferences.startscreen</code></td><td>NS_STD_003</td></tr>
+    <tr><td><code>/mgmt/tm/cm/device-group</code></td><td>NS_STD_004</td></tr>
+    <tr><td><code>/mgmt/tm/cm/device-group/~Common~Device-Group-HA</code></td><td>NS_STD_005, NS_STD_006</td></tr>
+    <tr><td><code>/mgmt/tm/cm/traffic-group/~Common~traffic-group-1</code></td><td>NS_STD_007, NS_STD_008, NS_STD_009</td></tr>
+    <tr><td><code>/mgmt/tm/sys/dns</code></td><td>NS_STD_010</td></tr>
+    <tr><td><code>/mgmt/tm/auth/password-policy</code></td><td>NS_STD_011, NS_STD_022</td></tr>
+    <tr><td><code>/mgmt/tm/sys/db/systemauth.disablerootlogin</code></td><td>NS_STD_012</td></tr>
+    <tr><td><code>/mgmt/tm/net/self-allow</code></td><td>NS_STD_013</td></tr>
+    <tr><td><code>/mgmt/tm/sys/httpd</code></td><td>NS_STD_014, NS_STD_015, NS_STD_024, NS_STD_025</td></tr>
+    <tr><td><code>/mgmt/tm/auth/remote-role/role-info</code></td><td>NS_STD_016, NS_STD_017</td></tr>
+    <tr><td><code>/mgmt/tm/net/vlan</code></td><td>NS_STD_018, NS_STD_019</td></tr>
+    <tr><td><code>/mgmt/tm/sys/management-route</code></td><td>NS_STD_026</td></tr>
+    <tr><td><code>/mgmt/tm/net/route</code></td><td>NS_STD_027</td></tr>
+    <tr><td><code>/mgmt/tm/cm/device</code></td><td>NS_STD_028</td></tr>
+    <tr><td><code>/mgmt/tm/sys/file/ssl-cert/~Common~server.crt</code></td><td>NS_STD_029, NS_STD_030</td></tr>
+    <tr><td><code>/mgmt/tm/sys/global-settings</code></td><td>NS_STD_031</td></tr>
+  </table>
+
+  <!-- ═══════════════════════════════ OUTPUT ═══════════════════════════════ -->
+  <h2 id="output">Output CSV</h2>
+  <h3>Columnas</h3>
+  <table>
+    <tr><th>Columna</th><th>Descripción</th></tr>
+    <tr><td><code>Device</code></td><td>inventory_hostname del dispositivo</td></tr>
+    <tr><td><code>Code</code></td><td>Identificador del check (ej: 2.1.1, NS_STD_004)</td></tr>
+    <tr><td><code>Descripcion</code></td><td>Descripción legible del check</td></tr>
+    <tr><td><code>Valor_Obtenido</code></td><td>Valor actual del dispositivo (normalizado a minúsculas)</td></tr>
+    <tr><td><code>Valor_Recomendado</code></td><td>Valor esperado y/o comando de remediación tmsh</td></tr>
+    <tr><td><code>Resultado</code></td><td><strong>passed</strong> o <strong>failed</strong></td></tr>
+    <tr><td><code>Comando_Para_Validar</code></td><td>Comando tmsh para verificación manual</td></tr>
+    <tr><td><code>fecha</code></td><td>Fecha de ejecución del check (YYYY-MM-DD)</td></tr>
+  </table>
+
+  <!-- ═══════════════════════════════ SECURITY ═══════════════════════════════ -->
+  <h2 id="security">Consideraciones de Seguridad</h2>
+  <table>
+    <tr><th>Área</th><th>Implementación</th></tr>
+    <tr><td>Credenciales</td><td>Almacenadas en ansible-vault (AES-256); nunca en texto plano en el repo</td></tr>
+    <tr><td>Logging</td><td>Tareas con credenciales usan <code>no_log: true</code> (no aparecen en output)</td></tr>
+    <tr><td>Token lifecycle</td><td>Token creado → extendido → revocado siempre (bloque <code>always:</code>)</td></tr>
+    <tr><td>TLS</td><td><code>f5_validate_certs: false</code> por defecto (labs); usar <code>true</code> en producción</td></tr>
+    <tr><td>Permisos F5</td><td>Usuario de auditoría con rol mínimo de <em>Operator</em> es suficiente (solo GET)</td></tr>
+    <tr><td>API Django</td><td>Autenticación JWT per-run; credenciales en vault</td></tr>
+  </table>
+
+  <p style="margin-top:3rem;color:#999;font-size:12px;text-align:center">
+    F5 BIG-IP Hardening Framework · Referencia Técnica · Generado: 2026-04-23
+  </p>
+</main>
+</body>
+</html>

@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>F5 Initial Setup — Referencia Técnica</title>
+<style>
+  :root {
+    --f5-dark:   #1a2238;
+    --f5-blue:   #0066cc;
+    --f5-orange: #e85d26;
+    --f5-light:  #f5f7fa;
+    --border:    #d1d9e6;
+    --text:      #1e2d40;
+    --muted:     #5a6a7e;
+    --code-bg:   #1e2d40;
+    --code-fg:   #c9d1d9;
+    --green:     #1a7f37;
+    --red:       #cf222e;
+    --amber:     #9a6700;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; color: var(--text); background: var(--f5-light); font-size: 14px; line-height: 1.6; }
+  @media print { body { font-size: 12px; } .no-print { display: none; } }
+
+  /* Header */
+  header { background: var(--f5-dark); color: white; padding: 28px 40px; display: flex; align-items: center; gap: 20px; }
+  header .badge { background: var(--f5-orange); color: white; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  header h1 { font-size: 22px; font-weight: 700; }
+  header p { font-size: 13px; color: #a0b4cc; margin-top: 4px; }
+  .header-text { flex: 1; }
+
+  /* Nav */
+  nav { background: white; border-bottom: 2px solid var(--border); padding: 0 40px; position: sticky; top: 0; z-index: 100; }
+  nav ul { list-style: none; display: flex; gap: 0; overflow-x: auto; }
+  nav a { display: block; padding: 14px 18px; text-decoration: none; color: var(--muted); font-size: 13px; font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -2px; white-space: nowrap; }
+  nav a:hover, nav a.active { color: var(--f5-blue); border-bottom-color: var(--f5-blue); }
+
+  /* Layout */
+  main { max-width: 1100px; margin: 0 auto; padding: 32px 40px; }
+  section { margin-bottom: 48px; scroll-margin-top: 60px; }
+  h2 { font-size: 20px; font-weight: 700; color: var(--f5-dark); border-bottom: 2px solid var(--f5-orange); padding-bottom: 8px; margin-bottom: 20px; }
+  h3 { font-size: 15px; font-weight: 700; color: var(--f5-dark); margin: 20px 0 10px; }
+  h4 { font-size: 13px; font-weight: 600; color: var(--muted); margin: 14px 0 6px; text-transform: uppercase; letter-spacing: 0.4px; }
+  p { margin-bottom: 10px; color: var(--text); }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 13px; }
+  th { background: var(--f5-dark); color: white; padding: 9px 12px; text-align: left; font-weight: 600; font-size: 12px; }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:nth-child(even) td { background: #f0f4f9; }
+  tr:hover td { background: #e8f0fc; }
+
+  /* Code */
+  code { font-family: 'Consolas', 'SF Mono', monospace; background: #edf2f7; color: var(--f5-dark); padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+  pre { background: var(--code-bg); color: var(--code-fg); padding: 18px; border-radius: 8px; overflow-x: auto; font-size: 12px; line-height: 1.7; margin: 12px 0; font-family: 'Consolas', 'SF Mono', monospace; }
+  pre .comment { color: #6a8ba4; }
+  pre .key { color: #79b8ff; }
+  pre .val { color: #f8c555; }
+  pre .str { color: #9ecbff; }
+
+  /* Badges */
+  .tag { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; }
+  .tag-native { background: #d4f4dd; color: var(--green); }
+  .tag-uri { background: #fff3cd; color: var(--amber); }
+  .tag-loop { background: #d0e8ff; color: var(--f5-blue); }
+  .tag-req { background: #ffe0d0; color: var(--red); }
+  .tag-opt { background: #e8edf5; color: var(--muted); }
+  .tag-ent { background: #e6dcff; color: #6f42c1; }
+
+  /* Cards */
+  .card { background: white; border: 1px solid var(--border); border-radius: 8px; padding: 18px 20px; margin-bottom: 16px; }
+  .card-title { font-weight: 700; color: var(--f5-dark); font-size: 14px; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+  .card-checks { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+
+  /* Tree */
+  .tree { font-family: 'Consolas', monospace; font-size: 13px; line-height: 2; background: var(--code-bg); color: var(--code-fg); padding: 18px; border-radius: 8px; }
+  .tree .dir { color: #79b8ff; }
+  .tree .file { color: #c9d1d9; }
+  .tree .new { color: #85e89d; }
+  .tree .mod { color: #ffea7f; }
+
+  /* Alert */
+  .alert { border-left: 4px solid; padding: 12px 16px; border-radius: 0 6px 6px 0; margin: 12px 0; font-size: 13px; }
+  .alert-info { border-color: var(--f5-blue); background: #e8f0fc; }
+  .alert-warn { border-color: var(--amber); background: #fff8e6; }
+
+  /* Footer */
+  footer { background: var(--f5-dark); color: #6a8ba4; text-align: center; padding: 20px; font-size: 12px; margin-top: 40px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-text">
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:6px">
+      <h1>F5 BIG-IP Initial Setup</h1>
+      <span class="badge">Referencia Técnica</span>
+    </div>
+    <p>Rol Ansible <code style="background:rgba(255,255,255,0.15);color:white">f5_initial_setup</code> &nbsp;·&nbsp; Perfil CIS hardening_v_1.5 + NS_STD &nbsp;·&nbsp; f5networks.f5_modules</p>
+  </div>
+</header>
+
+<nav>
+  <ul>
+    <li><a href="#arquitectura">Arquitectura</a></li>
+    <li><a href="#archivos">Archivos</a></li>
+    <li><a href="#tareas">Tareas</a></li>
+    <li><a href="#variables">Variables</a></li>
+    <li><a href="#modulos">Módulos</a></li>
+    <li><a href="#vault">Vault</a></li>
+  </ul>
+</nav>
+
+<main>
+
+<!-- ARQUITECTURA -->
+<section id="arquitectura">
+  <h2>Arquitectura del Rol</h2>
+  <p>El rol <strong>f5_initial_setup</strong> aplica hardening de seguridad en dispositivos F5 BIG-IP usando exclusivamente la colección <code>f5networks.f5_modules</code> y llamadas directas a la iControlREST API (fallback <code>uri</code> para endpoints sin módulo nativo). La autenticación de los módulos se maneja con el patrón <code>f5_provider</code>; las tareas <code>uri</code> usan un token iControlREST obtenido una sola vez por host (header <code>X-F5-Auth-Token</code>) y revocado al final.</p>
+
+  <h3>Flujo de ejecución</h3>
+  <div class="alert alert-info">El playbook corre completamente en <strong>localhost</strong> (el controller Ansible). Se conecta al BIG-IP via HTTPS contra el puerto de gestión. No se requiere SSH al dispositivo.</div>
+
+  <table>
+    <tr><th>Paso</th><th>Descripción</th></tr>
+    <tr><td>1</td><td>Ansible carga <code>defaults/main.yml</code> como base de variables</td></tr>
+    <tr><td>2</td><td><code>group_vars/</code> sobreescribe con valores del sitio</td></tr>
+    <tr><td>3</td><td><code>tasks/main.yml</code> orquesta los <code>include_tasks</code> por categoría</td></tr>
+    <tr><td>4</td><td>Cada task file llama módulos nativos o <code>uri</code> para configurar el BIG-IP</td></tr>
+    <tr><td>5</td><td>Todos los módulos son idempotentes: segunda ejecución → <code>ok</code> (sin cambios)</td></tr>
+  </table>
+
+  <h3>Perfiles cubiertos</h3>
+  <table>
+    <tr><th>Perfil</th><th>Checks</th><th>Categorías</th></tr>
+    <tr><td><code>hardening_v_1_5</code></td><td>2.1.x – 2.6.x (46 checks)</td><td>Password, Auth, HTTPD, SSHD, NTP, Self-IP, Named, SNMP, Logging</td></tr>
+    <tr><td><code>network_services_std</code></td><td>NS_STD_001–031 (27 checks)</td><td>Sistema, DNS, HA, Remote Roles + extensiones en módulos existentes</td></tr>
+  </table>
+</section>
+
+<!-- ARCHIVOS -->
+<section id="archivos">
+  <h2>Estructura de Archivos</h2>
+  <div class="tree">
+<span class="dir">Initial Setup/</span><br>
+├── <span class="file">requirements.yml</span>               <span class="comment"># colección f5networks.f5_modules</span><br>
+├── <span class="file">setup.yml</span>                      <span class="comment"># playbook principal</span><br>
+├── <span class="dir">inventory/</span><br>
+│   ├── <span class="file">hosts.ini</span><br>
+│   └── <span class="dir">group_vars/</span><br>
+│       ├── <span class="file">f5_devices.yml</span>         <span class="comment"># variables comunes (sitio)</span><br>
+│       └── <span class="file">f5_devices.vault.yml</span>   <span class="comment"># credenciales (encriptado)</span><br>
+└── <span class="dir">roles/f5_initial_setup/</span><br>
+    ├── <span class="dir">defaults/</span><br>
+    │   └── <span class="mod">main.yml</span>               <span class="comment"># ← todos los valores por defecto</span><br>
+    ├── <span class="dir">meta/</span><br>
+    │   └── <span class="file">main.yml</span><br>
+    └── <span class="dir">tasks/</span><br>
+        ├── <span class="mod">main.yml</span>               <span class="comment"># orquestador</span><br>
+        ├── <span class="mod">password_policy.yml</span>    <span class="comment"># 2.1.x + NS_STD_011/022</span><br>
+        ├── <span class="file">auth_source.yml</span>        <span class="comment"># 2.2.x</span><br>
+        ├── <span class="mod">httpd.yml</span>              <span class="comment"># 2.3.x + NS_STD_014/015/024/025</span><br>
+        ├── <span class="file">sshd.yml</span>               <span class="comment"># 2.4.x</span><br>
+        ├── <span class="file">ntp.yml</span>                <span class="comment"># 2.5.1</span><br>
+        ├── <span class="mod">self_ip.yml</span>            <span class="comment"># 2.5.3 + NS_STD_013</span><br>
+        ├── <span class="file">named.yml</span>              <span class="comment"># 2.5.4</span><br>
+        ├── <span class="file">snmp.yml</span>               <span class="comment"># 2.6.1-2.6.3</span><br>
+        ├── <span class="file">logging.yml</span>            <span class="comment"># 2.6.4-2.6.14</span><br>
+        ├── <span class="file">mgmt_route.yml</span>         <span class="comment"># NS_STD_026</span><br>
+        ├── <span class="new">system.yml</span>             <span class="comment"># NS_STD_001/002/003/012/031 ← nuevo</span><br>
+        ├── <span class="new">dns.yml</span>                <span class="comment"># NS_STD_010 ← nuevo</span><br>
+        └── <span class="new">remote_roles.yml</span>       <span class="comment"># NS_STD_016/017 ← nuevo</span>
+  </div>
+  <p style="margin-top:10px;font-size:12px;color:var(--muted)"><span style="color:#ffea7f">■</span> amarillo = modificado &nbsp; <span style="color:#85e89d">■</span> verde = nuevo en esta versión</p>
+</section>
+
+<!-- TAREAS -->
+<section id="tareas">
+  <h2>Detalle por Archivo de Tarea</h2>
+
+  <div class="card">
+    <div class="card-title"><span class="tag tag-native">nativo</span> password_policy.yml</div>
+    <div class="card-checks">Checks: 2.1.1–2.1.6 · NS_STD_011 · NS_STD_022</div>
+    <table>
+      <tr><th>Módulo</th><th>Parámetros clave</th></tr>
+      <tr><td><code>bigip_auth_password_policy</code></td><td><code>min_length</code>, <code>required_lower/upper/special</code>, <code>password_memory</code>, <code>policy_enforcement</code>, <code>max_duration</code>, <code>expiration_warning</code></td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="tag tag-native">nativo</span> <span class="tag tag-uri">uri fallback</span> auth_source.yml</div>
+    <div class="card-checks">Checks: 2.2.1–2.2.5</div>
+    <table>
+      <tr><th>Módulo / Endpoint</th><th>Propósito</th></tr>
+      <tr><td><code>bigip_auth_source</code></td><td>Tipo de auth (AD/LDAP) y fallback a local</td></tr>
+      <tr><td><code>uri → /mgmt/tm/auth/remote-user</code></td><td>Default role (no-access) y deshabilitar consola remota</td></tr>
+      <tr><td><code>bigip_auth_active_directory</code></td><td>Servidores AD (cuando <code>f5_auth_type = active-directory</code>)</td></tr>
+      <tr><td><code>bigip_auth_ldap</code></td><td>Servidores LDAP (cuando <code>f5_auth_type = ldap</code>)</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="tag tag-native">nativo</span> <span class="tag tag-uri">uri fallback</span> httpd.yml</div>
+    <div class="card-checks">Checks: 2.3.1–2.3.3 · 2.5.2 · NS_STD_014 · NS_STD_015 · NS_STD_024 · NS_STD_025</div>
+    <table>
+      <tr><th>Módulo / Endpoint</th><th>Propósito</th></tr>
+      <tr><td><code>bigip_sys_httpd</code></td><td>Timeout PAM, IPs permitidas, SSL, redirect HTTP→HTTPS, max_clients, dashboard timeout, validate IP</td></tr>
+      <tr><td><code>uri → /mgmt/tm/sys/httpd</code> (include)</td><td>FileETag (2.5.2) + mitigación LocationMatch CVE-2020-5902 (K52145254) combinados en el campo <code>include</code> (no expuesto en módulo)</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="tag tag-native">nativo</span> <span class="tag tag-uri">uri fallback</span> sshd.yml</div>
+    <div class="card-checks">Checks: 2.4.1–2.4.9</div>
+    <table>
+      <tr><th>Módulo / Endpoint</th><th>Propósito</th></tr>
+      <tr><td><code>bigip_sys_sshd</code></td><td>Banner, timeout, IPs permitidas, KexAlgorithms, Ciphers, MACs, HostKeyAlgorithms</td></tr>
+      <tr><td><code>uri → /mgmt/tm/cli/global-settings</code></td><td>CLI idle timeout (sin módulo nativo)</td></tr>
+      <tr><td><code>bigip_sys_global_settings</code></td><td>Console inactivity timeout</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="tag tag-native">nativo</span> ntp.yml</div>
+    <div class="card-checks">Checks: 2.5.1</div>
+    <table>
+      <tr><th>Módulo</th><th>Parámetros</th></tr>
+      <tr><td><code>bigip_device_ntp</code></td><td><code>ntp_servers</code>, <code>timezone</code></td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="tag tag-native">nativo</span> <span class="tag tag-loop">loop</span> <span class="tag tag-uri">uri fallback</span> self_ip.yml</div>
+    <div class="card-checks">Checks: 2.5.3 · NS_STD_013</div>
+    <table>
+      <tr><th>Módulo / Endpoint</th><th>Propósito</th></tr>
+      <tr><td><code>bigip_device_info</code> (gather: self-ips)</td><td>Descubrir todos los Self IPs existentes</td></tr>
+      <tr><td><code>bigip_self_ip</code> (loop)</td><td>Establecer <code>allow_service: none</code> en cada Self IP</td></tr>
+      <tr><td><code>uri → /mgmt/tm/net/self-allow</code></td><td>Self-allow defaults = none (sin módulo nativo)</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="tag tag-uri">uri fallback</span> named.yml</div>
+    <div class="card-checks">Checks: 2.5.4</div>
+    <table>
+      <tr><th>Endpoint</th><th>Propósito</th></tr>
+      <tr><td><code>uri → /mgmt/tm/util/bash</code></td><td>Detener el servicio <code>named</code> (bigstart stop named)</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="tag tag-native">nativo</span> <span class="tag tag-loop">loop</span> snmp.yml</div>
+    <div class="card-checks">Checks: 2.6.1–2.6.3</div>
+    <table>
+      <tr><th>Módulo</th><th>Propósito</th></tr>
+      <tr><td><code>bigip_snmp</code></td><td>Deshabilitar SNMPv1/v2c, restringir IPs</td></tr>
+      <tr><td><code>bigip_device_info</code> (gather: snmp-communities)</td><td>Descubrir communities existentes</td></tr>
+      <tr><td><code>bigip_snmp_community</code> (loop, state: absent)</td><td>Eliminar todas las communities</td></tr>
+      <tr><td><code>uri → /mgmt/tm/sys/snmp/users</code> (loop)</td><td>Crear/actualizar los usuarios SNMPv3 de <code>f5_snmpv3_users</code> (<code>no_log: true</code>)</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="tag tag-native">nativo</span> <span class="tag tag-loop">loop</span> logging.yml</div>
+    <div class="card-checks">Checks: 2.6.4–2.6.14</div>
+    <table>
+      <tr><th>Módulo</th><th>Propósito</th></tr>
+      <tr><td><code>bigip_sys_db</code> (loop sobre <code>f5_logaccess_db_keys</code>)</td><td>Deshabilitar log access por rol + habilitar config.auditing</td></tr>
+      <tr><td><code>bigip_sys_global_settings</code></td><td>Habilitar GUI audit logging</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="tag tag-native">nativo</span> <span class="tag tag-loop">loop</span> mgmt_route.yml</div>
+    <div class="card-checks">Checks: NS_STD_026</div>
+    <table>
+      <tr><th>Módulo</th><th>Propósito</th></tr>
+      <tr><td><code>bigip_management_route</code> (loop sobre <code>f5_mgmt_routes</code>)</td><td>Crear rutas de management (nombre recomendado: <code>route_to_mgmt</code>)</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="tag tag-native">nativo</span> <span class="tag tag-loop">loop</span> system.yml <span style="color:var(--green);font-size:12px">● nuevo</span></div>
+    <div class="card-checks">Checks: NS_STD_001 · NS_STD_002 · NS_STD_003 · NS_STD_012 · NS_STD_031</div>
+    <table>
+      <tr><th>Módulo</th><th>Propósito</th></tr>
+      <tr><td><code>bigip_sys_db</code> (loop sobre <code>f5_system_db_keys</code>)</td><td>Root login, advisory banner, start screen</td></tr>
+      <tr><td><code>bigip_sys_global_settings</code></td><td>Hostname del dispositivo</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="tag tag-native">nativo</span> dns.yml <span style="color:var(--green);font-size:12px">● nuevo</span></div>
+    <div class="card-checks">Checks: NS_STD_010</div>
+    <table>
+      <tr><th>Módulo</th><th>Propósito</th></tr>
+      <tr><td><code>bigip_device_dns</code></td><td>Servidores DNS (mínimo 2 requeridos)</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="tag tag-native">nativo</span> <span class="tag tag-loop">loop</span> remote_roles.yml <span style="color:var(--green);font-size:12px">● nuevo</span></div>
+    <div class="card-checks">Checks: NS_STD_016 · NS_STD_017</div>
+    <table>
+      <tr><th>Módulo</th><th>Propósito</th></tr>
+      <tr><td><code>bigip_remote_role</code> (loop sobre <code>f5_remote_role_groups</code>)</td><td>Crear remote role groups AD/LDAP (netdeck_ns, network_services_cyberark)</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- VARIABLES -->
+<section id="variables">
+  <h2>Referencia de Variables</h2>
+  <p>Todas las variables tienen valor por defecto en <code>defaults/main.yml</code>. Las marcadas <span class="tag tag-req">obligatorio</span> deben definirse en <code>group_vars</code>.</p>
+
+  <h3>Conexión / Provider</h3>
+  <table>
+    <tr><th>Variable</th><th>Default</th><th>Descripción</th></tr>
+    <tr><td><code>f5_api_port</code></td><td><code>443</code></td><td>Puerto de la API de gestión</td></tr>
+    <tr><td><code>f5_validate_certs</code></td><td><code>false</code></td><td>Validar certificado SSL del BIG-IP</td></tr>
+    <tr><td><code>f5_auth_provider</code></td><td><code>tmos</code></td><td>Proveedor de auth para el módulo (tmos / ldap / nombre AD)</td></tr>
+
+  </table>
+
+  <h3>Password Policy (2.1.x + NS_STD_011/022)</h3>
+  <table>
+    <tr><th>Variable</th><th>Default</th><th>Check</th></tr>
+    <tr><td><code>f5_password_enforcement</code></td><td><code>enabled</code></td><td>2.1.1</td></tr>
+    <tr><td><code>f5_password_min_length</code></td><td><code>15</code></td><td>2.1.2</td></tr>
+    <tr><td><code>f5_password_required_lower</code></td><td><code>1</code></td><td>2.1.3</td></tr>
+    <tr><td><code>f5_password_required_upper</code></td><td><code>1</code></td><td>2.1.4</td></tr>
+    <tr><td><code>f5_password_required_special</code></td><td><code>1</code></td><td>2.1.5</td></tr>
+    <tr><td><code>f5_password_memory</code></td><td><code>15</code></td><td>2.1.6</td></tr>
+    <tr><td><code>f5_password_max_duration</code></td><td><code>60</code></td><td>NS_STD_011</td></tr>
+    <tr><td><code>f5_password_expiration_warning</code></td><td><code>7</code></td><td>NS_STD_022</td></tr>
+  </table>
+
+  <h3>Auth Source (2.2.x)</h3>
+  <table>
+    <tr><th>Variable</th><th>Default</th><th>Check</th></tr>
+    <tr><td><code>f5_auth_type</code></td><td><code>active-directory</code></td><td>2.2.1</td></tr>
+    <tr><td><code>f5_auth_servers</code> <span class="tag tag-ent">por entidad</span></td><td>entities/&lt;entity&gt;.yml</td><td>2.2.2</td></tr>
+    <tr><td><code>f5_auth_fallback</code></td><td><code>true</code></td><td>2.2.3</td></tr>
+    <tr><td><code>f5_auth_default_role</code></td><td><code>no-access</code></td><td>2.2.4</td></tr>
+    <tr><td><code>f5_auth_remote_console</code></td><td><code>disabled</code></td><td>2.2.5</td></tr>
+  </table>
+
+  <h3>HTTPD (2.3.x + NS_STD_014/015/024/025)</h3>
+  <table>
+    <tr><th>Variable</th><th>Default</th><th>Check</th></tr>
+    <tr><td><code>f5_httpd_idle_timeout</code></td><td><code>599</code></td><td>2.3.1</td></tr>
+    <tr><td><code>f5_httpd_allow</code> <span class="tag tag-req">obligatorio</span></td><td><code>[]</code></td><td>2.3.2</td></tr>
+    <tr><td><code>f5_httpd_ssl_protocol</code></td><td><code>tlsv1.2 tlsv1.3</code></td><td>2.3.3</td></tr>
+    <tr><td><code>f5_httpd_fileetag</code></td><td><code>MTime Size</code></td><td>2.5.2</td></tr>
+    <tr><td><code>f5_httpd_include_extra</code></td><td>bloque <code>LocationMatch</code> K52145254</td><td>CVE-2020-5902</td></tr>
+    <tr><td><code>f5_httpd_redirect_http_to_https</code></td><td><code>enabled</code></td><td>NS_STD_014</td></tr>
+    <tr><td><code>f5_httpd_max_clients</code></td><td><code>10</code></td><td>NS_STD_015</td></tr>
+    <tr><td><code>f5_httpd_auth_pam_dashboard_timeout</code></td><td><code>on</code></td><td>NS_STD_024</td></tr>
+    <tr><td><code>f5_httpd_auth_pam_validate_ip</code></td><td><code>on</code></td><td>NS_STD_025</td></tr>
+  </table>
+
+  <h3>SNMP (2.6.x)</h3>
+  <table>
+    <tr><th>Variable</th><th>Default</th><th>Check</th></tr>
+    <tr><td><code>f5_snmp_allowed_addresses</code> <span class="tag tag-ent">por entidad</span></td><td><code>[]</code></td><td>2.6.1</td></tr>
+    <tr><td><code>f5_snmpv3_users</code> <span class="tag tag-ent">por entidad</span></td><td><code>[]</code> (lista; 2-3 usuarios según entidad)</td><td>2.6.3</td></tr>
+    <tr><td><code>f5_snmpv3_users[].auth_password / priv_password</code> <span class="tag tag-req">vault</span></td><td><code>lb_snmpv3_&lt;usuario&gt;_auth_password</code></td><td>2.6.3</td></tr>
+  </table>
+</section>
+
+<!-- MÓDULOS -->
+<section id="modulos">
+  <h2>Módulos Ansible Utilizados</h2>
+  <table>
+    <tr><th>Módulo</th><th>Tareas</th><th>Tipo</th></tr>
+    <tr><td><code>bigip_auth_password_policy</code></td><td>password_policy.yml</td><td><span class="tag tag-native">nativo</span></td></tr>
+    <tr><td><code>bigip_auth_source</code></td><td>auth_source.yml</td><td><span class="tag tag-native">nativo</span></td></tr>
+    <tr><td><code>bigip_auth_active_directory</code></td><td>auth_source.yml</td><td><span class="tag tag-native">nativo</span></td></tr>
+    <tr><td><code>bigip_auth_ldap</code></td><td>auth_source.yml</td><td><span class="tag tag-native">nativo</span></td></tr>
+    <tr><td><code>bigip_sys_httpd</code></td><td>httpd.yml</td><td><span class="tag tag-native">nativo</span></td></tr>
+    <tr><td><code>bigip_sys_sshd</code></td><td>sshd.yml</td><td><span class="tag tag-native">nativo</span></td></tr>
+    <tr><td><code>bigip_sys_global_settings</code></td><td>sshd.yml, logging.yml, system.yml</td><td><span class="tag tag-native">nativo</span></td></tr>
+    <tr><td><code>bigip_device_ntp</code></td><td>ntp.yml</td><td><span class="tag tag-native">nativo</span></td></tr>
+    <tr><td><code>bigip_device_info</code></td><td>self_ip.yml, snmp.yml</td><td><span class="tag tag-native">nativo</span></td></tr>
+    <tr><td><code>bigip_self_ip</code></td><td>self_ip.yml</td><td><span class="tag tag-native">nativo</span></td></tr>
+    <tr><td><code>bigip_snmp</code></td><td>snmp.yml</td><td><span class="tag tag-native">nativo</span></td></tr>
+    <tr><td><code>bigip_snmp_community</code></td><td>snmp.yml</td><td><span class="tag tag-native">nativo</span></td></tr>
+    <tr><td><code>bigip_snmp_user</code></td><td>snmp.yml</td><td><span class="tag tag-native">nativo</span></td></tr>
+    <tr><td><code>bigip_sys_db</code></td><td>logging.yml, system.yml</td><td><span class="tag tag-native">nativo</span></td></tr>
+    <tr><td><code>bigip_management_route</code></td><td>mgmt_route.yml</td><td><span class="tag tag-native">nativo</span></td></tr>
+    <tr><td><code>bigip_device_dns</code></td><td>dns.yml</td><td><span class="tag tag-native">nativo</span></td></tr>
+    <tr><td><code>bigip_remote_role</code></td><td>remote_roles.yml</td><td><span class="tag tag-native">nativo</span></td></tr>
+    <tr><td><code>ansible.builtin.uri</code></td><td>auth_source, httpd, sshd, self_ip, named</td><td><span class="tag tag-uri">uri fallback</span></td></tr>
+  </table>
+  <div class="alert alert-warn">Los <strong>uri fallback</strong> se usan únicamente en endpoints donde no existe módulo nativo en la colección. Se autentican con el token iControlREST compartido (header <code>X-F5-Auth-Token</code>), obtenido una vez por host y revocado en el bloque <code>always</code>.</div>
+</section>
+
+<!-- VAULT -->
+<section id="vault">
+  <h2>Secretos y Vault</h2>
+  <p>Las credenciales sensibles nunca deben estar en texto plano. Se almacenan en <code>inventory/group_vars/f5_devices.vault.yml</code> y se encriptan con <strong>ansible-vault</strong>.</p>
+  <h3>Variables a proteger con vault</h3>
+  <table>
+    <tr><th>Variable</th><th>Uso</th></tr>
+    <tr><td><code>ansible_password</code></td><td>Contraseña del usuario admin del BIG-IP</td></tr>
+    <tr><td><code>lb_snmpv3_&lt;usuario&gt;_auth_password / _priv_password</code></td><td>Contraseñas SNMPv3 — un par por cada usuario de <code>f5_snmpv3_users</code></td></tr>
+  </table>
+  <h3>Comandos</h3>
+  <pre>
+<span class="comment"># Crear archivo vault</span>
+ansible-vault create inventory/group_vars/f5_devices.vault.yml
+
+<span class="comment"># Encriptar archivo existente</span>
+ansible-vault encrypt inventory/group_vars/f5_devices.vault.yml
+
+<span class="comment"># Editar vault</span>
+ansible-vault edit inventory/group_vars/f5_devices.vault.yml</pre>
+</section>
+
+</main>
+<footer>F5 BIG-IP Initial Setup · Rol Ansible f5_initial_setup · Colección f5networks.f5_modules ≥1.20.0 · Ansible ≥2.14</footer>
+</body>
+</html>

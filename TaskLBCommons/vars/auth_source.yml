@@ -1,0 +1,14 @@
+---
+# Variables para auth_source.yml
+
+# ── Tipo de autenticación ─────────────────────────────────────────────────────
+auth_type:    "active-directory"   # active-directory | ldap
+
+# ── Fallback a auth local si el servidor remoto no responde ───────────────────
+auth_fallback: true
+
+# ── Rol por defecto para usuarios remotos sin role group asignado ─────────────
+auth_default_role: "no-access"     # no-access | guest | operator | manager | admin
+
+# ── Acceso a consola para usuarios remotos ────────────────────────────────────
+auth_remote_console: "disabled"    # disabled | tmsh | bash

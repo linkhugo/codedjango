@@ -1,0 +1,72 @@
+---
+# Playbook: ntp_servers.yml
+#
+# Configura los servidores NTP y timezone en dispositivos F5 BIG-IP.
+# Requiere mínimo 2 servidores NTP.
+#
+# IMPORTANTE: Solo aplica a equipos en estado Failover ACTIVE.
+#
+# Uso:
+#   ansible-playbook ntp_servers.yml --ask-vault-pass
+#   ansible-playbook ntp_servers.yml -l lb01 --ask-vault-pass
+
+- hosts: f5_devices
+  gather_facts: false
+  vars_files:
+    - vars/f5_common.yml
+    - vars/ntp_servers.yml
+
+  tasks:
+
+    - name: "Bloque principal con cleanup de token"
+      block:
+
+        - name: "Inicializar sesión y verificar Failover Active"
+          ansible.builtin.include_tasks: tasks/f5_init_active.yml
+
+        - name: "Consultar configuración NTP actual de {{ inventory_hostname }}"
+          ansible.builtin.uri:
+            url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/sys/ntp"
+            method: GET
+            headers:
+              X-F5-Auth-Token: "{{ f5_api_token }}"
+            validate_certs: "{{ f5_validate_certs }}"
+            status_code: 200
+            timeout: 30
+          delegate_to: localhost
+          register: _ntp_before
+
+        - name: "NTP — estado ANTES en {{ inventory_hostname }}"
+          ansible.builtin.debug:
+            msg:
+              servidores: "{{ _ntp_before.json.servers | default([]) }}"
+              timezone:   "{{ _ntp_before.json.timezone | default('none') }}"
+
+        - name: "Configurar servidores NTP en {{ inventory_hostname }}"
+          f5networks.f5_modules.bigip_device_ntp:
+            ntp_servers: "{{ ntp_servers }}"
+            timezone:    "{{ ntp_timezone }}"
+            provider:    "{{ f5_provider }}"
+
+        - name: "Consultar configuración NTP actualizada de {{ inventory_hostname }}"
+          ansible.builtin.uri:
+            url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/sys/ntp"
+            method: GET
+            headers:
+              X-F5-Auth-Token: "{{ f5_api_token }}"
+            validate_certs: "{{ f5_validate_certs }}"
+            status_code: 200
+            timeout: 30
+          delegate_to: localhost
+          register: _ntp_after
+
+        - name: "NTP — estado DESPUÉS en {{ inventory_hostname }}"
+          ansible.builtin.debug:
+            msg:
+              servidores: "{{ _ntp_after.json.servers | default([]) }}"
+              timezone:   "{{ _ntp_after.json.timezone | default('none') }}"
+
+      always:
+
+        - name: "Revocar token iControlREST"
+          ansible.builtin.include_tasks: tasks/f5_revoke_token.yml

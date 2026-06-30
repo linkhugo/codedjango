@@ -1,0 +1,53 @@
+---
+# Variables específicas de la entidad PER.
+# Se cargan vía vars_files cuando un host tiene `entity=PER` en el inventario.
+# Sobreescriben los defaults del rol f5_initial_setup.
+
+# ── 2.2.2 — Servidores Active Directory / LDAP ───────────────────────────────
+f5_auth_servers:
+  - "dc1.per.corp.com"
+  - "dc2.per.corp.com"
+
+# ── NS_STD_010 — DNS ─────────────────────────────────────────────────────────
+f5_dns_servers:
+  - "10.3.1.53"
+  - "10.3.2.53"
+f5_dns_search:
+  - "per.corp.com"
+
+# ── 2.6.1 — Subredes permitidas para SNMP ────────────────────────────────────
+f5_snmp_allowed_addresses:
+  - "10.3.0.0/16"
+
+# ── 2.6.3 — Usuarios SNMPv3 (PER usa 2) ──────────────────────────────────────
+# Las contraseñas viven en el vault; aquí solo se referencian por nombre.
+f5_snmpv3_users:
+  - name:          "nms_per"
+    auth_password: "{{ lb_snmpv3_nms_per_auth_password | default('') }}"
+    priv_password: "{{ lb_snmpv3_nms_per_priv_password | default('') }}"
+  - name:          "monitor_per"
+    auth_password: "{{ lb_snmpv3_monitor_per_auth_password | default('') }}"
+    priv_password: "{{ lb_snmpv3_monitor_per_priv_password | default('') }}"
+
+# ── 2.5.1 — NTP ──────────────────────────────────────────────────────────────
+f5_ntp_servers:
+  - "ntp1.per.corp.com"
+  - "ntp2.per.corp.com"
+f5_ntp_timezone: "America/Lima"
+
+# ── NS_STD_016/017 — Remote Role Groups ──────────────────────────────────────
+f5_remote_role_groups:
+  - name:             "netdeck_ns"
+    line_order:       100
+    attribute_string: "CN=netdeck_ns,OU=Groups,DC=per,DC=corp,DC=com"
+    assigned_role:    "manager"
+    remote_access:    true
+    terminal_access:  "tmsh"
+    partition_access: "all"
+  - name:             "network_services_cyberark"
+    line_order:       200
+    attribute_string: "CN=network_services_cyberark,OU=Groups,DC=per,DC=corp,DC=com"
+    assigned_role:    "manager"
+    remote_access:    true
+    terminal_access:  "tmsh"
+    partition_access: "all"

@@ -1,0 +1,13 @@
+---
+# Check: NS_STD_010
+# Configura los servidores DNS del plano de gestión.
+# Se requieren al menos 2 servidores para pasar el check NS_STD_010.
+#
+# Sobreescribir f5_dns_servers en group_vars con los DNS del sitio.
+
+- name: "NS_STD_010 — Configurar DNS (mínimo 2 servidores)"
+  f5networks.f5_modules.bigip_device_dns:
+    name_servers: "{{ f5_dns_servers }}"
+    search:       "{{ f5_dns_search | default(omit) }}"
+    provider:     "{{ f5_provider }}"
+  when: f5_dns_servers | length >= 2

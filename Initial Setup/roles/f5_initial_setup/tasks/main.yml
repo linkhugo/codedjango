@@ -1,0 +1,83 @@
+---
+# tasks/main.yml — Orquestador del rol f5_initial_setup
+#
+# Aplica la configuración de hardening por categorías.
+#
+# Autenticación:
+#   - Las tareas ansible.builtin.uri usan un token iControlREST obtenido UNA
+#     sola vez por host (f5_get_token.yml) y reutilizado via header
+#     X-F5-Auth-Token. El token se revoca siempre en el bloque always:.
+#   - Los módulos f5networks.f5_modules siguen usando el dict f5_provider
+#     (gestionan su propio token internamente).
+#
+# Perfiles cubiertos:
+#   hardening_v_1_5      → checks 2.1.x – 2.6.x  (todos los include_tasks sin prefijo NS_STD)
+#   network_services_std → checks NS_STD_001–031   (system, dns, ha, remote_roles + extensiones)
+
+- name: "Aplicar hardening con ciclo de vida de token gestionado"
+  block:
+
+    # ── Autenticación: token único por host ───────────────────────────────────
+    - name: "Obtener token iControlREST"
+      ansible.builtin.include_tasks: f5_get_token.yml
+
+    # ── Perfil hardening_v_1_5 ─────────────────────────────────────────────────
+
+    - name: "Configurar password policy (2.1.x + NS_STD_011/022)"
+      ansible.builtin.include_tasks: password_policy.yml
+      when: not f5_skip_password_policy | bool
+
+    - name: "Configurar auth source (2.2.x)"
+      ansible.builtin.include_tasks: auth_source.yml
+      when: not f5_skip_auth_source | bool
+
+    - name: "Configurar HTTPD (2.3.x + 2.5.2 + NS_STD_014/015/024/025)"
+      ansible.builtin.include_tasks: httpd.yml
+      when: not f5_skip_httpd | bool
+
+    - name: "Configurar SSHD (2.4.x)"
+      ansible.builtin.include_tasks: sshd.yml
+      when: not f5_skip_sshd | bool
+
+    - name: "Configurar NTP (2.5.1)"
+      ansible.builtin.include_tasks: ntp.yml
+      when: not f5_skip_ntp | bool
+
+    - name: "Configurar Self IPs - allow-service (2.5.3 + NS_STD_013)"
+      ansible.builtin.include_tasks: self_ip.yml
+      when: not f5_skip_self_ip | bool
+
+    - name: "Detener servicio named (2.5.4)"
+      ansible.builtin.include_tasks: named.yml
+      when: not f5_skip_named | bool
+
+    - name: "Configurar SNMP (2.6.1-2.6.3)"
+      ansible.builtin.include_tasks: snmp.yml
+      when: not f5_skip_snmp | bool
+
+    - name: "Configurar logging y auditoría (2.6.4-2.6.14)"
+      ansible.builtin.include_tasks: logging.yml
+      when: not f5_skip_logging | bool
+
+    - name: "Configurar rutas de management (NS_STD_026)"
+      ansible.builtin.include_tasks: mgmt_route.yml
+      when: not f5_skip_mgmt_route | bool
+
+    # ── Perfil network_services_std ────────────────────────────────────────────
+
+    - name: "Configurar sistema (NS_STD_001/002/003/012/031)"
+      ansible.builtin.include_tasks: system.yml
+      when: not f5_skip_system | bool
+
+    - name: "Configurar DNS (NS_STD_010)"
+      ansible.builtin.include_tasks: dns.yml
+      when: not f5_skip_dns | bool
+
+    - name: "Configurar remote role groups AD/LDAP (NS_STD_016/017)"
+      ansible.builtin.include_tasks: remote_roles.yml
+      when: not f5_skip_remote_roles | bool
+
+  always:
+
+    - name: "Revocar token iControlREST"
+      ansible.builtin.include_tasks: f5_revoke_token.yml

@@ -1,0 +1,9 @@
+---
+# Copiar este archivo a f5_devices.vault.yml y encriptar con:
+#   ansible-vault encrypt inventory/group_vars/f5_devices.vault.yml
+#
+# Ejecutar el playbook con:
+#   ansible-playbook hardening.yml --ask-vault-pass
+#   ansible-playbook hardening.yml --vault-password-file ~/.vault_pass
+
+ansible_password: "tu_password_aqui"

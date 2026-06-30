@@ -1,0 +1,27 @@
+---
+# Valores COMPARTIDOS por todas las entidades del grupo f5_devices.
+# Sobreescriben los defaults del rol f5_initial_setup.
+# Las credenciales van en f5_devices.vault.yml (ansible-vault).
+#
+# NOTA: Las variables que cambian por entidad (f5_auth_servers, f5_dns_servers,
+# f5_dns_search, f5_ntp_servers, f5_ntp_timezone, f5_snmp_allowed_addresses,
+# f5_remote_role_groups) NO van aquí — viven en entities/<entity>.yml y se cargan
+# según la var `entity` del host.
+
+# ── Autenticación iControlREST ────────────────────────────────────────────────
+# f5_auth_provider: "tmos"    # Cambiar a "ldap" o nombre del AD si aplica
+
+# ── Fuente de autenticación (2.2.x) ──────────────────────────────────────────
+# f5_auth_type: "active-directory"   # active-directory | ldap
+
+# ── Subredes permitidas (compartidas) ─────────────────────────────────────────
+# f5_snmp_allowed_addresses va por entidad (entities/<entity>.yml), no aquí.
+# f5_httpd_allow:
+#   - "10.0.0.0/8"
+# f5_sshd_allow:
+#   - "10.0.0.0/8"
+
+# ── Banner SSH (2.4.1) ────────────────────────────────────────────────────────
+# f5_sshd_banner_text: >
+#   AUTHORIZED USE ONLY. This system is property of Acme Corp.
+#   Unauthorized access is strictly prohibited.

@@ -1,0 +1,19 @@
+# Renombrar a f5_devices.vault.yml y encriptar con:
+#   ansible-vault encrypt inventory/group_vars/f5_devices.vault.yml
+#
+# O crear directamente:
+#   ansible-vault create inventory/group_vars/f5_devices.vault.yml
+
+ansible_password: "changeme"
+
+# Contraseñas SNMPv3 (check 2.6.3) — un par auth/priv por cada usuario de
+# f5_snmpv3_users (definidos en entities/<entity>.yml). Convención de nombre:
+#   lb_snmpv3_<usuario>_auth_password / lb_snmpv3_<usuario>_priv_password
+# Ejemplo para la entidad MEX (3 usuarios):
+lb_snmpv3_nms_mex_auth_password:     "changeme"
+lb_snmpv3_nms_mex_priv_password:     "changeme"
+lb_snmpv3_monitor_mex_auth_password: "changeme"
+lb_snmpv3_monitor_mex_priv_password: "changeme"
+lb_snmpv3_backup_mex_auth_password:  "changeme"
+lb_snmpv3_backup_mex_priv_password:  "changeme"
+# ...y los pares equivalentes para nms_usa/monitor_usa, nms_per/monitor_per, etc.

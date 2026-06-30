@@ -1,0 +1,9 @@
+---
+# Variables para ntp_servers.yml
+# Se requieren mínimo 2 servidores NTP.
+
+ntp_servers:
+  - "ntp1.corp.example.com"
+  - "ntp2.corp.example.com"
+
+ntp_timezone: "America/Mexico_City"

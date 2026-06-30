@@ -1,0 +1,38 @@
+---
+# Checks: 2.5.3, NS_STD_013
+# Obtiene todos los Self IPs y establece allowService: none en cada uno.
+# Un Self IP con "Allow All" o servicios extra fallará el check.
+# NS_STD_013: self-allow defaults = none (global, aplica a nuevos Self IPs).
+
+- name: "2.5.3 — Obtener lista de Self IPs"
+  f5networks.f5_modules.bigip_device_info:
+    gather_subset:
+      - self-ips
+    provider: "{{ f5_provider }}"
+  register: _f5_device_info
+
+- name: "2.5.3 — Aplicar allow-service none en cada Self IP"
+  f5networks.f5_modules.bigip_self_ip:
+    name:          "{{ _self.name }}"
+    allow_service: "none"
+    state:         present
+    provider:      "{{ f5_provider }}"
+  loop: "{{ _f5_device_info.self_ips | default([]) }}"
+  loop_control:
+    loop_var: _self
+    label:    "{{ _self.name }}"
+
+# Sin módulo nativo para /mgmt/tm/net/self-allow
+- name: "NS_STD_013 — Self-allow defaults = none (uri fallback)"
+  ansible.builtin.uri:
+    url:           "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/net/self-allow"
+    method:        PATCH
+    body_format:   json
+    body:
+      defaults: "none"
+    headers:
+      X-F5-Auth-Token: "{{ f5_api_token }}"
+    validate_certs:  "{{ f5_validate_certs }}"
+    status_code:     200
+    timeout:         30
+  delegate_to: localhost

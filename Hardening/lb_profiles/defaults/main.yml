@@ -1,0 +1,8 @@
+#SPDX-License-Identifier: MIT-0
+---
+# defaults file for lb_profiles
+
+profile_name: hardening_v_1_5
+
+lb_user: "{{ provider.user }}"
+lb_pass: "{{ provider.password }}"

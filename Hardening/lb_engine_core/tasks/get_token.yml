@@ -1,0 +1,42 @@
+---
+# Obtiene un token iControlREST y extiende su timeout.
+# El token se almacena en f5_api_token (hecho de host).
+#
+# no_log: true en todas las tareas para que las credenciales y el token
+# nunca aparezcan en logs ni en la salida de Ansible.
+
+- name: "Autenticar en iControlREST y obtener token para {{ inventory_hostname }}"
+  ansible.builtin.uri:
+    url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/shared/authn/login"
+    method: POST
+    body_format: json
+    body:
+      username: "{{ lb_user }}"
+      password: "{{ lb_pass }}"
+      loginProviderName: "{{ f5_auth_provider }}"
+    validate_certs: "{{ f5_validate_certs }}"
+    status_code: 200
+    timeout: 30
+  register: _f5_login_response
+  delegate_to: localhost
+  no_log: true
+
+- name: "Extender timeout del token a {{ f5_token_timeout }} segundos"
+  ansible.builtin.uri:
+    url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/shared/authz/tokens/{{ _f5_login_response.json.token.token }}"
+    method: PATCH
+    body_format: json
+    body:
+      timeout: "{{ f5_token_timeout }}"
+    headers:
+      X-F5-Auth-Token: "{{ _f5_login_response.json.token.token }}"
+    validate_certs: "{{ f5_validate_certs }}"
+    status_code: 200
+    timeout: 30
+  delegate_to: localhost
+  no_log: true
+
+- name: "Almacenar token de sesion"
+  ansible.builtin.set_fact:
+    f5_api_token: "{{ _f5_login_response.json.token.token }}"
+  no_log: true

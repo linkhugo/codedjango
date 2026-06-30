@@ -1,0 +1,9 @@
+---
+galaxy_info:
+  role_name: f5_initial_setup
+  description: >
+    Aplica configuración inicial de hardening en F5 BIG-IP vía f5networks.f5_modules
+    para que todos los checks del perfil hardening_v_1_5 reporten "passed".
+  min_ansible_version: "2.14"
+
+dependencies: []

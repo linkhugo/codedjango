@@ -1,0 +1,11 @@
+---
+# Variables para auth_servers.yml
+#
+# Define el tipo de auth y la lista completa de servidores.
+# La lista reemplaza los servidores existentes (no agrega).
+
+auth_type: "active-directory"   # active-directory | ldap
+
+auth_servers:
+  - "dc1.corp.example.com"
+  - "dc2.corp.example.com"

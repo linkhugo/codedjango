@@ -1,0 +1,5 @@
+---
+# Variables para ha_sync.yml
+# Nombre del device group HA configurado en el par.
+
+ha_device_group: "Device-Group-HA"

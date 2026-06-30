@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Catálogo de Checks — F5 BIG-IP Hardening</title>
+<style>
+  :root {
+    --red: #CC0000;
+    --dark: #1A1A1A;
+    --mid: #444;
+    --light: #F5F5F5;
+    --border: #DDDDDD;
+    --blue: #0060A9;
+    --green: #2E7D32;
+    --purple: #6A0DAD;
+    --code-bg: #F0F0F0;
+    --sidebar-w: 220px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: var(--dark); background: #fff; }
+
+  /* Sidebar */
+  #sidebar {
+    position: fixed; top: 0; left: 0; width: var(--sidebar-w);
+    height: 100vh; background: var(--dark); color: #fff;
+    overflow-y: auto; padding-bottom: 2rem; z-index: 100;
+  }
+  #sidebar .logo { background: var(--red); padding: 1rem 1.2rem; font-size: 13px; font-weight: 700; }
+  #sidebar .logo span { display: block; font-size: 10px; font-weight: 400; opacity: .8; margin-top: 2px; }
+  #sidebar nav a { display: block; padding: .4rem 1.2rem; color: #bbb; text-decoration: none; font-size: 12px; border-left: 3px solid transparent; }
+  #sidebar nav a:hover { color: #fff; border-left-color: var(--red); background: rgba(255,255,255,.06); }
+  #sidebar nav .sep { padding: .6rem 1.2rem .2rem; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #555; }
+
+  /* Main */
+  #main { margin-left: var(--sidebar-w); padding: 2rem 2.5rem 4rem; }
+  .doc-header { margin-bottom: 2rem; }
+  .doc-header h1 { font-size: 22px; color: var(--red); }
+  .doc-header p { color: #666; font-size: 13px; margin-top: .3rem; }
+
+  h2 { font-size: 16px; color: var(--red); margin: 2.5rem 0 1rem; padding-bottom: .4rem; border-bottom: 2px solid var(--red); }
+  h3 { font-size: 13px; font-weight: 700; color: var(--blue); margin: 1.5rem 0 .5rem; padding: .35rem .7rem; background: #EEF4FB; border-left: 3px solid var(--blue); }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; font-size: 12.5px; }
+  th { background: var(--dark); color: #fff; padding: .5rem .7rem; text-align: left; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+  td { padding: .45rem .7rem; border-bottom: 1px solid var(--border); vertical-align: top; line-height: 1.5; }
+  tr:nth-child(even) td { background: var(--light); }
+  tr:hover td { background: #EEF4FB; }
+  .col-code  { width: 110px; font-weight: 700; white-space: nowrap; }
+  .col-desc  { width: 22%; }
+  .col-cmd   { width: 26%; }
+  .col-valor { width: 24%; }
+  .col-policy{ width: 14%; }
+
+  /* Code */
+  code { font-family: 'Courier New', monospace; font-size: 11.5px; background: var(--code-bg); padding: .1rem .3rem; border-radius: 3px; color: #333; word-break: break-all; }
+
+  /* Badges */
+  .badge { display: inline-block; padding: .12rem .45rem; border-radius: 3px; font-size: 10.5px; font-weight: 700; white-space: nowrap; }
+  .b-blue   { background: #E3F0FB; color: var(--blue); }
+  .b-green  { background: #E8F5E9; color: var(--green); }
+  .b-purple { background: #F3E5F5; color: var(--purple); }
+  .b-gray   { background: #EEEEEE; color: #555; }
+  .b-red    { background: #FDECEA; color: var(--red); }
+
+  /* Summary cards */
+  .cards { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1rem 0 2rem; }
+  .card { flex: 1; min-width: 140px; background: var(--light); border: 1px solid var(--border); border-radius: 6px; padding: .8rem 1rem; text-align: center; }
+  .card .num { font-size: 28px; font-weight: 700; color: var(--red); line-height: 1; }
+  .card .lbl { font-size: 11px; color: #666; margin-top: .3rem; }
+
+  /* Policy legend */
+  .legend { display: flex; flex-wrap: wrap; gap: .4rem; margin: .5rem 0 1.5rem; }
+
+  /* Print */
+  @media print {
+    #sidebar { display: none; }
+    #main { margin-left: 0; padding: 1rem 1.5rem; }
+    h2 { page-break-before: always; }
+    h2:first-of-type, .doc-header { page-break-before: avoid; }
+    table { page-break-inside: avoid; font-size: 11px; }
+    th { font-size: 10px; }
+    td { font-size: 10.5px; padding: .3rem .5rem; }
+  }
+</style>
+</head>
+<body>
+
+<aside id="sidebar">
+  <div class="logo">F5 Hardening<span>Catálogo de Checks</span></div>
+  <nav>
+    <div class="sep">Resumen</div>
+    <a href="#summary">Estadísticas</a>
+    <a href="#legend">Tipos de Validación</a>
+
+    <div class="sep">CIS Benchmark</div>
+    <a href="#cat21">2.1 — Password Policy</a>
+    <a href="#cat22">2.2 — Autenticación</a>
+    <a href="#cat23">2.3 — HTTPD</a>
+    <a href="#cat24">2.4 — SSH</a>
+    <a href="#cat25">2.5 — Servicios</a>
+    <a href="#cat26">2.6 — SNMP y Logging</a>
+
+    <div class="sep">NS_STD</div>
+    <a href="#ns-banner">Banner</a>
+    <a href="#ns-ha">HA / Traffic Groups</a>
+    <a href="#ns-net">Red y Seguridad</a>
+    <a href="#ns-roles">Roles Remotos</a>
+    <a href="#ns-vlan">VLAN Failsafe</a>
+    <a href="#ns-passwd">Password Policy</a>
+    <a href="#ns-httpd">HTTPD Sesión</a>
+    <a href="#ns-routes">Routing</a>
+    <a href="#ns-certs">Certificados</a>
+    <a href="#ns-sync">HA Sync / Hostname</a>
+  </nav>
+</aside>
+
+<main id="main">
+  <div class="doc-header">
+    <h1>Catálogo de Parámetros y Checks</h1>
+    <p>F5 BIG-IP Hardening Framework — Todos los checks de ambos perfiles de auditoría</p>
+  </div>
+
+  <!-- ═══ SUMMARY ═══ -->
+  <h2 id="summary">Estadísticas Generales</h2>
+  <div class="cards">
+    <div class="card"><div class="num">43</div><div class="lbl">Checks CIS<br>hardening_v_1_5</div></div>
+    <div class="card"><div class="num">28</div><div class="lbl">Checks NS_STD<br>network_services_std_values</div></div>
+    <div class="card"><div class="num">71</div><div class="lbl">Total checks<br>(combined_audit)</div></div>
+    <div class="card"><div class="num">13</div><div class="lbl">Tipos de<br>validación</div></div>
+    <div class="card"><div class="num">35+</div><div class="lbl">Endpoints<br>iControlREST</div></div>
+  </div>
+
+  <!-- ═══ LEGEND ═══ -->
+  <h2 id="legend">Tipos de Validación</h2>
+  <div class="legend">
+    <span class="badge b-blue">allow_any</span>
+    <span class="badge b-red">deny</span>
+    <span class="badge b-red">deny_contains</span>
+    <span class="badge b-gray">not_empty</span>
+    <span class="badge b-gray">must_be_empty</span>
+    <span class="badge b-blue">allow_only</span>
+    <span class="badge b-green">numeric_gte</span>
+    <span class="badge b-green">numeric_lte</span>
+    <span class="badge b-green">numeric_eq</span>
+    <span class="badge b-green">min_list_count</span>
+    <span class="badge b-green">min_entry_count</span>
+    <span class="badge b-purple">must_contain_hostname</span>
+    <span class="badge b-purple">cert_max_days_remaining</span>
+  </div>
+  <table>
+    <tr><th>Tipo</th><th>Descripción</th><th>Parámetros</th></tr>
+    <tr><td><span class="badge b-blue">allow_any</span></td><td>Al menos uno de los valores debe aparecer en la respuesta</td><td><code>values: [...]</code></td></tr>
+    <tr><td><span class="badge b-red">deny</span></td><td>Ninguno de los valores puede aparecer (token exacto)</td><td><code>values: [...]</code></td></tr>
+    <tr><td><span class="badge b-red">deny_contains</span></td><td>Ningún token puede coincidir con el patrón regex</td><td><code>pattern: "..."</code></td></tr>
+    <tr><td><span class="badge b-gray">not_empty</span></td><td>La respuesta no debe estar vacía</td><td>—</td></tr>
+    <tr><td><span class="badge b-gray">must_be_empty</span></td><td>La respuesta debe estar vacía</td><td>—</td></tr>
+    <tr><td><span class="badge b-blue">allow_only</span></td><td>Solo los valores especificados pueden aparecer</td><td><code>values: [...]</code></td></tr>
+    <tr><td><span class="badge b-green">numeric_gte</span></td><td>Valor numérico ≥ umbral</td><td><code>value: N</code></td></tr>
+    <tr><td><span class="badge b-green">numeric_lte</span></td><td>Valor numérico ≤ umbral</td><td><code>value: N</code></td></tr>
+    <tr><td><span class="badge b-green">numeric_eq</span></td><td>Valor numérico = umbral (exacto)</td><td><code>value: N</code></td></tr>
+    <tr><td><span class="badge b-green">min_list_count</span></td><td>La lista de valores tiene al menos N elementos</td><td><code>value: N</code></td></tr>
+    <tr><td><span class="badge b-green">min_entry_count</span></td><td>Conteo de entradas NTP ≥ umbral</td><td><code>value: N</code></td></tr>
+    <tr><td><span class="badge b-purple">must_contain_hostname</span></td><td>El valor debe contener el inventory_hostname (case-insensitive)</td><td>—</td></tr>
+    <tr><td><span class="badge b-purple">cert_max_days_remaining</span></td><td>La expiración del certificado no supera N días desde hoy</td><td><code>value: días</code></td></tr>
+  </table>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!--            PERFIL: hardening_v_1_5                -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <h2 id="cis">Perfil: hardening_v_1_5 — CIS Benchmark (43 checks)</h2>
+
+  <!-- 2.1 -->
+  <h3 id="cat21">Categoría 2.1 — Password Policy (6 checks)</h3>
+  <table>
+    <colgroup><col class="col-code"><col class="col-desc"><col class="col-cmd"><col class="col-valor"><col class="col-policy"></colgroup>
+    <tr><th>Código</th><th>Descripción</th><th>Comando tmsh</th><th>Valor Recomendado</th><th>Validación</th></tr>
+    <tr><td class="col-code">2.1.1</td><td>Password policy enforcement habilitada</td><td><code>list auth password-policy policy-enforcement</code></td><td>enabled</td><td><span class="badge b-blue">allow_any</span></td></tr>
+    <tr><td class="col-code">2.1.2</td><td>Longitud mínima de contraseña</td><td><code>list auth password-policy minimum-length</code></td><td>= 15 caracteres</td><td><span class="badge b-green">numeric_eq</span></td></tr>
+    <tr><td class="col-code">2.1.3</td><td>Mínimo 1 letra minúscula requerida</td><td><code>list auth password-policy required-lowercase</code></td><td>= 1</td><td><span class="badge b-green">numeric_eq</span></td></tr>
+    <tr><td class="col-code">2.1.4</td><td>Mínimo 1 letra mayúscula requerida</td><td><code>list auth password-policy required-uppercase</code></td><td>= 1</td><td><span class="badge b-green">numeric_eq</span></td></tr>
+    <tr><td class="col-code">2.1.5</td><td>Mínimo 1 carácter especial requerido</td><td><code>list auth password-policy required-special</code></td><td>= 1</td><td><span class="badge b-green">numeric_eq</span></td></tr>
+    <tr><td class="col-code">2.1.6</td><td>Historial de contraseñas (no reutilizar)</td><td><code>list auth password-policy password-memory</code></td><td>= 15 contraseñas</td><td><span class="badge b-green">numeric_eq</span></td></tr>
+  </table>
+
+  <!-- 2.2 -->
+  <h3 id="cat22">Categoría 2.2 — Autenticación (5 checks)</h3>
+  <table>
+    <colgroup><col class="col-code"><col class="col-desc"><col class="col-cmd"><col class="col-valor"><col class="col-policy"></colgroup>
+    <tr><th>Código</th><th>Descripción</th><th>Comando tmsh</th><th>Valor Recomendado</th><th>Validación</th></tr>
+    <tr><td class="col-code">2.2.1</td><td>Fuente de autenticación remota configurada</td><td><code>list auth source type</code></td><td>active-directory o ldap</td><td><span class="badge b-blue">allow_any</span></td></tr>
+    <tr><td class="col-code">2.2.2</td><td>Servidores LDAP configurados</td><td><code>list auth ldap servers</code></td><td>Servidores corporativos</td><td><span class="badge b-blue">allow_any</span></td></tr>
+    <tr><td class="col-code">2.2.3</td><td>Fallback a autenticación local habilitado</td><td><code>list auth source fallback</code></td><td>true</td><td><span class="badge b-blue">allow_any</span></td></tr>
+    <tr><td class="col-code">2.2.4</td><td>Rol por defecto para usuarios remotos</td><td><code>list auth remote-user default-role</code></td><td>no-access</td><td><span class="badge b-blue">allow_any</span></td></tr>
+    <tr><td class="col-code">2.2.5</td><td>Acceso de consola remota deshabilitado</td><td><code>list auth remote-user remote-console-access</code></td><td>disabled</td><td><span class="badge b-blue">allow_any</span></td></tr>
+  </table>
+
+  <!-- 2.3 -->
+  <h3 id="cat23">Categoría 2.3 — HTTPD / Interfaz Web (3 checks)</h3>
+  <table>
+    <colgroup><col class="col-code"><col class="col-desc"><col class="col-cmd"><col class="col-valor"><col class="col-policy"></colgroup>
+    <tr><th>Código</th><th>Descripción</th><th>Comando tmsh</th><th>Valor Recomendado</th><th>Validación</th></tr>
+    <tr><td class="col-code">2.3.1</td><td>Timeout de inactividad del GUI</td><td><code>list sys httpd auth-pam-idle-timeout</code></td><td>= 599 segundos</td><td><span class="badge b-green">numeric_eq</span></td></tr>
+    <tr><td class="col-code">2.3.2</td><td>IPs permitidas para acceso al GUI</td><td><code>list sys httpd allow</code></td><td>Segmento específico (no 0.0.0.0/0)</td><td><span class="badge b-red">deny</span> + <span class="badge b-gray">not_empty</span></td></tr>
+    <tr><td class="col-code">2.3.3</td><td>Protocolo SSL/TLS mínimo del GUI</td><td><code>list sys httpd ssl-protocol</code></td><td>TLSv1.2 o TLSv1.3 (no SSLv2/3, TLSv1.0/1.1)</td><td><span class="badge b-blue">allow_any</span> + <span class="badge b-red">deny</span></td></tr>
+  </table>
+
+  <!-- 2.4 -->
+  <h3 id="cat24">Categoría 2.4 — SSH (9 checks)</h3>
+  <table>
+    <colgroup><col class="col-code"><col class="col-desc"><col class="col-cmd"><col class="col-valor"><col class="col-policy"></colgroup>
+    <tr><th>Código</th><th>Descripción</th><th>Comando tmsh</th><th>Valor Recomendado</th><th>Validación</th></tr>
+    <tr><td class="col-code">2.4.1</td><td>Texto del banner SSH (contiene "F5")</td><td><code>list sys sshd banner-text</code></td><td>Texto representativo con "F5"</td><td><span class="badge b-red">deny</span> + <span class="badge b-gray">not_empty</span></td></tr>
+    <tr><td class="col-code">2.4.2</td><td>Banner SSH habilitado</td><td><code>list sys sshd banner</code></td><td>enabled</td><td><span class="badge b-blue">allow_any</span></td></tr>
+    <tr><td class="col-code">2.4.3</td><td>Timeout de inactividad SSH</td><td><code>list sys sshd inactivity-timeout</code></td><td>= 599 segundos</td><td><span class="badge b-green">numeric_eq</span></td></tr>
+    <tr><td class="col-code">2.4.4</td><td>Timeout de inactividad CLI (tmsh)</td><td><code>list cli global-settings idle-timeout</code></td><td>= 599 segundos</td><td><span class="badge b-green">numeric_eq</span></td></tr>
+    <tr><td class="col-code">2.4.5</td><td>Timeout de inactividad de consola</td><td><code>list sys global-settings console-inactivity-timeout</code></td><td>= 599 segundos</td><td><span class="badge b-green">numeric_eq</span></td></tr>
+    <tr><td class="col-code">2.4.6</td><td>Algoritmos de intercambio de claves SSH (KEX)</td><td><code>list sys sshd include | grep KexAlgorithms</code></td><td>ecdh-sha2-nistp256/384/521, diffie-hellman-group16/18-sha512. Sin group14-sha1 ni sha1$</td><td><span class="badge b-red">deny_contains</span> + <span class="badge b-blue">allow_any</span></td></tr>
+    <tr><td class="col-code">2.4.7</td><td>Cifrados SSH permitidos</td><td><code>list sys sshd include | grep Ciphers</code></td><td>aes*-gcm@openssh.com. Sin CBC, arcfour, 3des, blowfish</td><td><span class="badge b-red">deny_contains</span> + <span class="badge b-blue">allow_any</span></td></tr>
+    <tr><td class="col-code">2.4.8</td><td>IPs permitidas para SSH</td><td><code>list sys sshd allow</code></td><td>Segmento específico (no 0.0.0.0/0)</td><td><span class="badge b-red">deny</span> + <span class="badge b-gray">not_empty</span></td></tr>
+    <tr><td class="col-code">2.4.9</td><td>Algoritmos MAC para SSH</td><td><code>list sys sshd include | grep MACs</code></td><td>hmac-sha2-256/512. Sin md5 ni sha1 sin -etm</td><td><span class="badge b-red">deny_contains</span> + <span class="badge b-blue">allow_any</span></td></tr>
+  </table>
+
+  <!-- 2.5 -->
+  <h3 id="cat25">Categoría 2.5 — Servicios y Misceláneos (4 checks)</h3>
+  <table>
+    <colgroup><col class="col-code"><col class="col-desc"><col class="col-cmd"><col class="col-valor"><col class="col-policy"></colgroup>
+    <tr><th>Código</th><th>Descripción</th><th>Comando tmsh</th><th>Valor Recomendado</th><th>Validación</th></tr>
+    <tr><td class="col-code">2.5.1</td><td>Servidores NTP configurados</td><td><code>list sys ntp servers</code></td><td>Mínimo 2 servidores NTP</td><td><span class="badge b-green">min_entry_count</span></td></tr>
+    <tr><td class="col-code">2.5.2</td><td>FileETag configurado en HTTPD</td><td><code>list sys httpd include | grep FileETag</code></td><td>FileETag MTime Size</td><td><span class="badge b-blue">allow_any</span></td></tr>
+    <tr><td class="col-code">2.5.3</td><td>Self-IPs con allow-service restringido</td><td><code>list net self oneline</code></td><td>none o solo puertos HA (tcp:1028, tcp:4353, udp:1026)</td><td><span class="badge b-blue">allow_only</span></td></tr>
+    <tr><td class="col-code">2.5.4</td><td>Servicio named detenido</td><td><code>show sys service named</code></td><td>Estado: stopped</td><td><span class="badge b-blue">allow_any</span></td></tr>
+  </table>
+
+  <!-- 2.6 -->
+  <h3 id="cat26">Categoría 2.6 — SNMP y Logging (16 checks)</h3>
+  <table>
+    <colgroup><col class="col-code"><col class="col-desc"><col class="col-cmd"><col class="col-valor"><col class="col-policy"></colgroup>
+    <tr><th>Código</th><th>Descripción</th><th>Comando tmsh</th><th>Valor Recomendado</th><th>Validación</th></tr>
+    <tr><td class="col-code">2.6.1</td><td>IPs permitidas para SNMP</td><td><code>list sys snmp allowed-addresses</code></td><td>Segmento específico (no 0.0.0.0/0)</td><td><span class="badge b-red">deny</span> + <span class="badge b-gray">not_empty</span></td></tr>
+    <tr><td class="col-code">2.6.2.1</td><td>SNMPv1 deshabilitado</td><td><code>list sys snmp snmpv1</code></td><td>disable</td><td><span class="badge b-blue">allow_any</span></td></tr>
+    <tr><td class="col-code">2.6.2.2</td><td>SNMPv2c deshabilitado</td><td><code>list sys snmp snmpv2c</code></td><td>disable</td><td><span class="badge b-blue">allow_any</span></td></tr>
+    <tr><td class="col-code">2.6.2</td><td>Sin community strings SNMP</td><td><code>list sys snmp communities</code></td><td>Lista vacía (sin communities)</td><td><span class="badge b-gray">must_be_empty</span></td></tr>
+    <tr><td class="col-code">2.6.3</td><td>Usuario SNMPv3 "Pruebas" existe</td><td><code>list sys snmp users | grep username</code></td><td>Existe usuario con username "pruebas"</td><td><span class="badge b-blue">allow_any</span></td></tr>
+    <tr><td class="col-code">2.6.4</td><td>Log access — Firewall Manager</td><td><code>list sys db ui.logaccess.firewallmanager</code></td><td>disable</td><td><span class="badge b-blue">allow_any</span></td></tr>
+    <tr><td class="col-code">2.6.5</td><td>Log access — Acceleration Policy Editor</td><td><code>list sys db ui.logaccess.accelartionpolicyeditor</code></td><td>disable</td><td><span class="badge b-blue">allow_any</span></td></tr>
+    <tr><td class="col-code">2.6.6</td><td>Log access — Guest</td><td><code>list sys db ui.logaccess.guest</code></td><td>disable</td><td><span class="badge b-blue">allow_any</span></td></tr>
+    <tr><td class="col-code">2.6.7</td><td>Log access — Operator</td><td><code>list sys db ui.logaccess.operator</code></td><td>disable</td><td><span class="badge b-blue">allow_any</span></td></tr>
+    <tr><td class="col-code">2.6.8</td><td>Log access — Application Editor</td><td><code>list sys db ui.logaccess.applicationeditor</code></td><td>disable</td><td><span class="badge b-blue">allow_any</span></td></tr>
+    <tr><td class="col-code">2.6.9</td><td>Log access — Manager</td><td><code>list sys db ui.logaccess.manager</code></td><td>disable</td><td><span class="badge b-blue">allow_any</span></td></tr>
+    <tr><td class="col-code">2.6.10</td><td>Log access — iRule Manager</td><td><code>list sys db ui.logaccess.irulemanager</code></td><td>disable</td><td><span class="badge b-blue">allow_any</span></td></tr>
+    <tr><td class="col-code">2.6.11</td><td>Log access — Certificate Manager</td><td><code>list sys db ui.logaccess.certificatemanager</code></td><td>disable</td><td><span class="badge b-blue">allow_any</span></td></tr>
+    <tr><td class="col-code">2.6.12</td><td>Log access — User Manager</td><td><code>list sys db ui.logaccess.usermanager</code></td><td>disable</td><td><span class="badge b-blue">allow_any</span></td></tr>
+    <tr><td class="col-code">2.6.13</td><td>Auditoría de cambios MCP habilitada</td><td><code>list sys db config.auditing</code></td><td>enable</td><td><span class="badge b-blue">allow_any</span></td></tr>
+    <tr><td class="col-code">2.6.14</td><td>Auditoría de GUI habilitada</td><td><code>list sys global-settings gui-audit</code></td><td>enabled</td><td><span class="badge b-blue">allow_any</span></td></tr>
+  </table>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!--       PERFIL: network_services_std_values          -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <h2 id="nsstd">Perfil: network_services_std_values — NS_STD (28 checks)</h2>
+
+  <h3 id="ns-banner">Advisory Banner (3 checks)</h3>
+  <table>
+    <colgroup><col class="col-code"><col class="col-desc"><col class="col-cmd"><col class="col-valor"><col class="col-policy"></colgroup>
+    <tr><th>Código</th><th>Descripción</th><th>Comando tmsh</th><th>Valor Recomendado</th><th>Validación</th></tr>
+    <tr><td class="col-code">NS_STD_001</td><td>Advisory Banner habilitado</td><td><code>list sys db ui.advisory.enabled</code></td><td>true</td><td><span class="badge b-blue">allow_any</span></td></tr>
+    <tr><td class="col-code">NS_STD_002</td><td>Color del Advisory Banner correcto</td><td><code>list sys db ui.advisory.color</code></td><td>blue (Primary) / orange (Secondary) / yellow (DRP)</td><td><span class="badge b-blue">allow_any</span></td></tr>
+    <tr><td class="col-code">NS_STD_003</td><td>Start Screen configurado en Performance</td><td><code>list sys db ui.system.preferences.startscreen</code></td><td>performance</td><td><span class="badge b-blue">allow_any</span></td></tr>
+  </table>
+
+  <h3 id="ns-ha">HA — Device Groups y Traffic Groups (6 checks)</h3>
+  <table>
+    <colgroup><col class="col-code"><col class="col-desc"><col class="col-cmd"><col class="col-valor"><col class="col-policy"></colgroup>
+    <tr><th>Código</th><th>Descripción</th><th>Comando tmsh</th><th>Valor Recomendado</th><th>Validación</th></tr>
+    <tr><td class="col-code">NS_STD_004</td><td>Device Group "Device-Group-HA" existe</td><td><code>list cm device-group</code></td><td>device-group-ha existe</td><td><span class="badge b-blue">allow_any</span></td></tr>
+    <tr><td class="col-code">NS_STD_005</td><td>Device Group tipo sync-failover</td><td><code>list cm device-group Device-Group-HA type</code></td><td>sync-failover</td><td><span class="badge b-blue">allow_any</span></td></tr>
+    <tr><td class="col-code">NS_STD_006</td><td>Network-failover habilitado en Device Group</td><td><code>list cm device-group Device-Group-HA network-failover</code></td><td>enabled</td><td><span class="badge b-blue">allow_any</span></td></tr>
+    <tr><td class="col-code">NS_STD_007</td><td>Traffic Group 1 con MAC masquerade configurada</td><td><code>list cm traffic-group traffic-group-1 mac</code></td><td>MAC válida (no "none")</td><td><span class="badge b-gray">not_empty</span> + <span class="badge b-red">deny</span></td></tr>
+    <tr><td class="col-code">NS_STD_008</td><td>Traffic Group 1 failover-method = ha-order</td><td><code>list cm traffic-group traffic-group-1 failover-method</code></td><td>ha-order</td><td><span class="badge b-blue">allow_any</span></td></tr>
+    <tr><td class="col-code">NS_STD_009</td><td>HA-order con mínimo 2 equipos</td><td><code>list cm traffic-group traffic-group-1 ha-order</code></td><td>≥ 2 dispositivos</td><td><span class="badge b-green">min_list_count</span></td></tr>
+  </table>
+
+  <h3 id="ns-net">Red, Seguridad y Contraseñas (6 checks)</h3>
+  <table>
+    <colgroup><col class="col-code"><col class="col-desc"><col class="col-cmd"><col class="col-valor"><col class="col-policy"></colgroup>
+    <tr><th>Código</th><th>Descripción</th><th>Comando tmsh</th><th>Valor Recomendado</th><th>Validación</th></tr>
+    <tr><td class="col-code">NS_STD_010</td><td>DNS con mínimo 2 servidores</td><td><code>list sys dns name-servers</code></td><td>≥ 2 servidores DNS</td><td><span class="badge b-green">min_list_count</span></td></tr>
+    <tr><td class="col-code">NS_STD_011</td><td>Password max-duration = 60 días</td><td><code>list auth password-policy max-duration</code></td><td>= 60 días</td><td><span class="badge b-green">numeric_eq</span></td></tr>
+    <tr><td class="col-code">NS_STD_012</td><td>Root login deshabilitado</td><td><code>list sys db systemauth.disablerootlogin</code></td><td>true</td><td><span class="badge b-blue">allow_any</span></td></tr>
+    <tr><td class="col-code">NS_STD_013</td><td>Self-allow default = none</td><td><code>list net self-allow defaults</code></td><td>none</td><td><span class="badge b-blue">allow_only</span></td></tr>
+    <tr><td class="col-code">NS_STD_014</td><td>Redirect HTTP a HTTPS habilitado</td><td><code>list sys httpd redirect-http-to-https</code></td><td>enabled</td><td><span class="badge b-blue">allow_any</span></td></tr>
+    <tr><td class="col-code">NS_STD_015</td><td>Máximo 10 conexiones HTTP simultáneas</td><td><code>list sys httpd max-clients</code></td><td>= 10</td><td><span class="badge b-green">numeric_eq</span></td></tr>
+  </table>
+
+  <h3 id="ns-roles">Roles Remotos (2 checks)</h3>
+  <table>
+    <colgroup><col class="col-code"><col class="col-desc"><col class="col-cmd"><col class="col-valor"><col class="col-policy"></colgroup>
+    <tr><th>Código</th><th>Descripción</th><th>Comando tmsh</th><th>Valor Recomendado</th><th>Validación</th></tr>
+    <tr><td class="col-code">NS_STD_016</td><td>Remote Role Group "Netdeck_NS" existe</td><td><code>list auth remote-role role-info</code></td><td>Grupo netdeck_ns creado</td><td><span class="badge b-blue">allow_any</span></td></tr>
+    <tr><td class="col-code">NS_STD_017</td><td>Remote Role Group "Network_Services_CyberArk" existe</td><td><code>list auth remote-role role-info</code></td><td>Grupo network_services_cyberark creado</td><td><span class="badge b-blue">allow_any</span></td></tr>
+  </table>
+
+  <h3 id="ns-vlan">VLAN Failsafe (2 checks)</h3>
+  <table>
+    <colgroup><col class="col-code"><col class="col-desc"><col class="col-cmd"><col class="col-valor"><col class="col-policy"></colgroup>
+    <tr><th>Código</th><th>Descripción</th><th>Comando tmsh</th><th>Valor Recomendado</th><th>Validación</th></tr>
+    <tr><td class="col-code">NS_STD_018</td><td>Al menos una VLAN con failsafe habilitado</td><td><code>list net vlan { failsafe }</code></td><td>Al menos una VLAN con failsafe = enabled</td><td><span class="badge b-blue">allow_any</span></td></tr>
+    <tr><td class="col-code">NS_STD_019</td><td>Al menos una VLAN con failsafe-action = failover</td><td><code>list net vlan { failsafe-action }</code></td><td>Al menos una VLAN con action = failover</td><td><span class="badge b-blue">allow_any</span></td></tr>
+  </table>
+
+  <h3 id="ns-passwd">Password Policy — Adicionales (1 check)</h3>
+  <table>
+    <colgroup><col class="col-code"><col class="col-desc"><col class="col-cmd"><col class="col-valor"><col class="col-policy"></colgroup>
+    <tr><th>Código</th><th>Descripción</th><th>Comando tmsh</th><th>Valor Recomendado</th><th>Validación</th></tr>
+    <tr><td class="col-code">NS_STD_022</td><td>Aviso de expiración de contraseña anticipado</td><td><code>list auth password-policy expiration-warning</code></td><td>≥ 7 días de anticipación</td><td><span class="badge b-green">numeric_gte</span></td></tr>
+  </table>
+
+  <h3 id="ns-httpd">HTTPD — Hardening de Sesión (2 checks)</h3>
+  <table>
+    <colgroup><col class="col-code"><col class="col-desc"><col class="col-cmd"><col class="col-valor"><col class="col-policy"></colgroup>
+    <tr><th>Código</th><th>Descripción</th><th>Comando tmsh</th><th>Valor Recomendado</th><th>Validación</th></tr>
+    <tr><td class="col-code">NS_STD_024</td><td>Timeout de sesión también en el dashboard</td><td><code>list sys httpd auth-pam-dashboard-timeout</code></td><td>on</td><td><span class="badge b-blue">allow_any</span></td></tr>
+    <tr><td class="col-code">NS_STD_025</td><td>Validación de IP por sesión habilitada</td><td><code>list sys httpd auth-pam-validate-ip</code></td><td>on</td><td><span class="badge b-blue">allow_any</span></td></tr>
+  </table>
+
+  <h3 id="ns-routes">Routing (2 checks)</h3>
+  <table>
+    <colgroup><col class="col-code"><col class="col-desc"><col class="col-cmd"><col class="col-valor"><col class="col-policy"></colgroup>
+    <tr><th>Código</th><th>Descripción</th><th>Comando tmsh</th><th>Valor Recomendado</th><th>Validación</th></tr>
+    <tr><td class="col-code">NS_STD_026</td><td>Ruta de management "Route_to_MGMT" existe</td><td><code>list sys management-route</code></td><td>Existe ruta con nombre route_to_mgmt</td><td><span class="badge b-blue">allow_any</span></td></tr>
+    <tr><td class="col-code">NS_STD_027</td><td>Ruta de red "default" existe (plano de datos)</td><td><code>list net route</code></td><td>Existe ruta con nombre default</td><td><span class="badge b-blue">allow_any</span></td></tr>
+  </table>
+
+  <h3 id="ns-sync">HA — Config Sync (1 check)</h3>
+  <table>
+    <colgroup><col class="col-code"><col class="col-desc"><col class="col-cmd"><col class="col-valor"><col class="col-policy"></colgroup>
+    <tr><th>Código</th><th>Descripción</th><th>Comando tmsh</th><th>Valor Recomendado</th><th>Validación</th></tr>
+    <tr><td class="col-code">NS_STD_028</td><td>Config Sync IP configurada (debe ser Management Address)</td><td><code>list cm device { configsync-ip management-ip }</code></td><td>IP configurada, no vacía ni "none"</td><td><span class="badge b-gray">not_empty</span> + <span class="badge b-red">deny</span></td></tr>
+  </table>
+
+  <h3 id="ns-certs">Certificados de Management (2 checks)</h3>
+  <table>
+    <colgroup><col class="col-code"><col class="col-desc"><col class="col-cmd"><col class="col-valor"><col class="col-policy"></colgroup>
+    <tr><th>Código</th><th>Descripción</th><th>Comando tmsh</th><th>Valor Recomendado</th><th>Validación</th></tr>
+    <tr><td class="col-code">NS_STD_029</td><td>CN del certificado GUI coincide con el hostname del inventario</td><td><code>list sys file ssl-cert server.crt { subject }</code></td><td>subject contiene el hostname del dispositivo</td><td><span class="badge b-purple">must_contain_hostname</span></td></tr>
+    <tr><td class="col-code">NS_STD_030</td><td>Vigencia del certificado GUI no supera 360 días</td><td><code>list sys file ssl-cert server.crt { expiration-date }</code></td><td>Expira dentro de 360 días desde hoy</td><td><span class="badge b-purple">cert_max_days_remaining</span></td></tr>
+  </table>
+
+  <h3 id="ns-hostname">Hostname (1 check)</h3>
+  <table>
+    <colgroup><col class="col-code"><col class="col-desc"><col class="col-cmd"><col class="col-valor"><col class="col-policy"></colgroup>
+    <tr><th>Código</th><th>Descripción</th><th>Comando tmsh</th><th>Valor Recomendado</th><th>Validación</th></tr>
+    <tr><td class="col-code">NS_STD_031</td><td>Hostname del equipo coincide con el inventory_hostname de Ansible</td><td><code>list sys global-settings hostname</code></td><td>Hostname contiene el nombre del inventario</td><td><span class="badge b-purple">must_contain_hostname</span></td></tr>
+  </table>
+
+  <p style="margin-top:3rem;color:#999;font-size:12px;text-align:center">
+    F5 BIG-IP Hardening Framework · Catálogo de Parámetros · Generado: 2026-04-23
+  </p>
+</main>
+</body>
+</html>

@@ -1,0 +1,53 @@
+---
+# Variables específicas de la entidad USA.
+# Se cargan vía vars_files cuando un host tiene `entity=USA` en el inventario.
+# Sobreescriben los defaults del rol f5_initial_setup.
+
+# ── 2.2.2 — Servidores Active Directory / LDAP ───────────────────────────────
+f5_auth_servers:
+  - "dc1.usa.corp.com"
+  - "dc2.usa.corp.com"
+
+# ── NS_STD_010 — DNS ─────────────────────────────────────────────────────────
+f5_dns_servers:
+  - "10.2.1.53"
+  - "10.2.2.53"
+f5_dns_search:
+  - "usa.corp.com"
+
+# ── 2.6.1 — Subredes permitidas para SNMP ────────────────────────────────────
+f5_snmp_allowed_addresses:
+  - "10.2.0.0/16"
+
+# ── 2.6.3 — Usuarios SNMPv3 (USA usa 2) ──────────────────────────────────────
+# Las contraseñas viven en el vault; aquí solo se referencian por nombre.
+f5_snmpv3_users:
+  - name:          "nms_usa"
+    auth_password: "{{ lb_snmpv3_nms_usa_auth_password | default('') }}"
+    priv_password: "{{ lb_snmpv3_nms_usa_priv_password | default('') }}"
+  - name:          "monitor_usa"
+    auth_password: "{{ lb_snmpv3_monitor_usa_auth_password | default('') }}"
+    priv_password: "{{ lb_snmpv3_monitor_usa_priv_password | default('') }}"
+
+# ── 2.5.1 — NTP ──────────────────────────────────────────────────────────────
+f5_ntp_servers:
+  - "ntp1.usa.corp.com"
+  - "ntp2.usa.corp.com"
+f5_ntp_timezone: "America/New_York"
+
+# ── NS_STD_016/017 — Remote Role Groups ──────────────────────────────────────
+f5_remote_role_groups:
+  - name:             "netdeck_ns"
+    line_order:       100
+    attribute_string: "CN=netdeck_ns,OU=Groups,DC=usa,DC=corp,DC=com"
+    assigned_role:    "manager"
+    remote_access:    true
+    terminal_access:  "tmsh"
+    partition_access: "all"
+  - name:             "network_services_cyberark"
+    line_order:       200
+    attribute_string: "CN=network_services_cyberark,OU=Groups,DC=usa,DC=corp,DC=com"
+    assigned_role:    "manager"
+    remote_access:    true
+    terminal_access:  "tmsh"
+    partition_access: "all"

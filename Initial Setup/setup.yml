@@ -1,0 +1,42 @@
+---
+# Playbook: setup.yml
+#
+# Aplica la configuración inicial de hardening en dispositivos F5 BIG-IP
+# para que los 36 checks del perfil hardening_v_1_5 reporten "passed".
+#
+# Uso (la entidad se pasa con -e entity=<MEX|USA|PER> y selecciona entities/<entity>.yml):
+#   ansible-playbook setup.yml -e entity=MEX --ask-vault-pass
+#   ansible-playbook setup.yml -e entity=MEX --limit mex-lb01 --ask-vault-pass
+#
+# Saltar categorías específicas:
+#   ansible-playbook setup.yml -e entity=MEX -e f5_skip_snmp=true --ask-vault-pass
+#
+# Variables de sitio compartidas (en inventory/group_vars/f5_devices.yml):
+#   f5_httpd_allow, f5_sshd_allow, f5_auth_provider
+#
+# Variables por entidad (en entities/<entity>.yml, seleccionado por -e entity=...):
+#   f5_auth_servers, f5_dns_servers, f5_dns_search, f5_ntp_servers,
+#   f5_ntp_timezone, f5_snmp_allowed_addresses, f5_remote_role_groups
+#
+# Credenciales en vault (inventory/group_vars/f5_devices.vault.yml):
+#   ansible_user, ansible_password, lb_snmpv3_auth_password
+
+- hosts: f5_devices
+  gather_facts: no
+  vars_files:
+    # `entity` se pasa con -e entity=<MEX|USA|PER>; carga el archivo de esa entidad.
+    - "entities/{{ entity }}.yml"
+  pre_tasks:
+    # vars_files solo emite un WARNING si `entity` no existe (no falla); este assert
+    # garantiza el fail-fast con un mensaje claro.
+    - name: "Validar que se pasó la variable `entity`"
+      ansible.builtin.assert:
+        that:
+          - entity is defined
+          - entity | length > 0
+        fail_msg: >-
+          Falta la variable `entity`. Ejecuta el playbook con
+          -e entity=<MEX|USA|PER> para cargar entities/<entity>.yml.
+        quiet: true
+  roles:
+    - f5_initial_setup

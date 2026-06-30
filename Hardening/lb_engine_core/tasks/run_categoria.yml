@@ -1,0 +1,11 @@
+---
+
+- name: "Filtrar checks para la categoria {{ categoria_actual }}"
+  ansible.builtin.set_fact:
+    checks_categoria: "{{ checks | selectattr('categoria','equalto',categoria_actual) | list }}"
+
+- name: "Ejecutar check {{ item.code }}"
+  ansible.builtin.include_tasks: execute_action.yml
+  loop: "{{ checks_categoria }}"
+  loop_control:
+    loop_var: item

@@ -1,0 +1,7 @@
+---
+# Variables para auth_fallback.yml
+#
+# auth_fallback_enabled: true  → si AD/LDAP no responde, se usa auth local
+# auth_fallback_enabled: false → sin fallback (solo auth remota)
+
+auth_fallback_enabled: true

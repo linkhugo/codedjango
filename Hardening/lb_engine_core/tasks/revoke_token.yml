@@ -1,0 +1,20 @@
+---
+# Revoca el token iControlREST para cerrar la sesión de forma segura.
+# Llamado desde el bloque always: de main.yml para garantizar ejecución
+# incluso si la auditoría falla a mitad.
+#
+# El guard "when: f5_api_token is defined" protege contra el caso donde
+# get_token.yml haya fallado y el token nunca se almacenó.
+
+- name: "Revocar token iControlREST para {{ inventory_hostname }}"
+  ansible.builtin.uri:
+    url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/shared/authz/tokens/{{ f5_api_token }}"
+    method: DELETE
+    headers:
+      X-F5-Auth-Token: "{{ f5_api_token }}"
+    validate_certs: "{{ f5_validate_certs }}"
+    status_code: [200, 404]    # 404 = token ya expiró/fue eliminado por F5 — no es error
+    timeout: 30
+  delegate_to: localhost
+  no_log: true
+  when: f5_api_token is defined

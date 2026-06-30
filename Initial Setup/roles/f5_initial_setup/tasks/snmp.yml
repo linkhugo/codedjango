@@ -1,0 +1,123 @@
+---
+# Checks: 2.6.1, 2.6.2, 2.6.2.1, 2.6.2.2, 2.6.3
+#
+# 2.6.1   → allowedAddresses: solo subredes definidas
+# 2.6.2.1 → snmpv1: disable
+# 2.6.2.2 → snmpv2c: disable
+# 2.6.2   → eliminar todas las communities v1/v2c
+# 2.6.3   → crear/actualizar los usuarios SNMPv3 de la lista f5_snmpv3_users (por entidad)
+#
+# NOTA: bigip_snmp no tiene parámetros snmpv1/snmpv2c — se usa URI PATCH.
+# NOTA: bigip_snmp_user no existe en la colección — se usa URI REST.
+
+# 2.6.1 — Restringir clientes SNMP (bigip_snmp sí tiene allowed_addresses)
+- name: "2.6.1 — Restringir clientes SNMP permitidos"
+  f5networks.f5_modules.bigip_snmp:
+    allowed_addresses: "{{ f5_snmp_allowed_addresses }}"
+    provider:          "{{ f5_provider }}"
+
+# 2.6.2.1 / 2.6.2.2 — Deshabilitar SNMPv1 y SNMPv2c via REST
+- name: "2.6.2.1/2.6.2.2 — Deshabilitar SNMPv1 y SNMPv2c"
+  ansible.builtin.uri:
+    url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/sys/snmp"
+    method: PATCH
+    body_format: json
+    body:
+      snmpv1:  "disable"
+      snmpv2c: "disable"
+    headers:
+      X-F5-Auth-Token: "{{ f5_api_token }}"
+    validate_certs:   "{{ f5_validate_certs }}"
+    status_code: 200
+    timeout: 30
+  delegate_to: localhost
+
+# 2.6.2 — Eliminar communities v1/v2c existentes
+- name: "2.6.2 — Recopilar communities SNMP existentes"
+  f5networks.f5_modules.bigip_device_info:
+    gather_subset:
+      - snmp-communities
+    provider: "{{ f5_provider }}"
+  register: _f5_snmp_info
+
+- name: "2.6.2 — Eliminar communities SNMP"
+  f5networks.f5_modules.bigip_snmp_community:
+    name:     "{{ _community.name }}"
+    state:    absent
+    provider: "{{ f5_provider }}"
+  loop: "{{ _f5_snmp_info.snmp_communities | default([]) }}"
+  loop_control:
+    loop_var: _community
+    label:    "{{ _community.name }}"
+
+# 2.6.3 — Crear/actualizar usuarios SNMPv3 via REST (bigip_snmp_user no existe).
+# f5_snmpv3_users es una lista (varía por entidad: 2 o 3 usuarios). Lista vacía → no-op.
+
+- name: "2.6.3 — Verificar qué usuarios SNMPv3 ya existen"
+  ansible.builtin.uri:
+    url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/sys/snmp/users/{{ _snmp_user.name }}"
+    method: GET
+    headers:
+      X-F5-Auth-Token: "{{ f5_api_token }}"
+    validate_certs:   "{{ f5_validate_certs }}"
+    status_code: [200, 404]
+    timeout: 30
+  delegate_to: localhost
+  register: _snmpv3_checks
+  no_log: true
+  loop: "{{ f5_snmpv3_users }}"
+  loop_control:
+    loop_var: _snmp_user
+    label:    "{{ _snmp_user.name }}"
+
+- name: "2.6.3 — Crear usuarios SNMPv3 que no existen"
+  ansible.builtin.uri:
+    url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/sys/snmp/users"
+    method: POST
+    body_format: json
+    body:
+      name:          "{{ _chk._snmp_user.name }}"
+      username:      "{{ _chk._snmp_user.name }}"
+      securityLevel: "{{ _chk._snmp_user.security_level | default('auth-privacy') }}"
+      authProtocol:    "{{ _chk._snmp_user.auth_protocol | default('sha') }}"
+      authPassword:    "{{ _chk._snmp_user.auth_password }}"
+      privacyProtocol: "{{ _chk._snmp_user.priv_protocol | default('aes') }}"
+      privacyPassword: "{{ _chk._snmp_user.priv_password }}"
+      oidSubset:     "{{ _chk._snmp_user.oid_subset | default('/') }}"
+    headers:
+      X-F5-Auth-Token: "{{ f5_api_token }}"
+    validate_certs:   "{{ f5_validate_certs }}"
+    status_code: 200
+    timeout: 30
+  delegate_to: localhost
+  no_log: true
+  loop: "{{ _snmpv3_checks.results }}"
+  loop_control:
+    loop_var: _chk
+    label:    "{{ _chk._snmp_user.name }}"
+  when: _chk.status == 404
+
+- name: "2.6.3 — Actualizar usuarios SNMPv3 que ya existen"
+  ansible.builtin.uri:
+    url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/sys/snmp/users/{{ _chk._snmp_user.name }}"
+    method: PATCH
+    body_format: json
+    body:
+      securityLevel: "{{ _chk._snmp_user.security_level | default('auth-privacy') }}"
+      authProtocol:    "{{ _chk._snmp_user.auth_protocol | default('sha') }}"
+      authPassword:    "{{ _chk._snmp_user.auth_password }}"
+      privacyProtocol: "{{ _chk._snmp_user.priv_protocol | default('aes') }}"
+      privacyPassword: "{{ _chk._snmp_user.priv_password }}"
+      oidSubset:     "{{ _chk._snmp_user.oid_subset | default('/') }}"
+    headers:
+      X-F5-Auth-Token: "{{ f5_api_token }}"
+    validate_certs:   "{{ f5_validate_certs }}"
+    status_code: 200
+    timeout: 30
+  delegate_to: localhost
+  no_log: true
+  loop: "{{ _snmpv3_checks.results }}"
+  loop_control:
+    loop_var: _chk
+    label:    "{{ _chk._snmp_user.name }}"
+  when: _chk.status == 200

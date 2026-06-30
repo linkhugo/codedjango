@@ -1,0 +1,18 @@
+---
+# Configura rutas de management en el plano de gestión (out-of-band).
+# La ruta es fija (name, network, description); solo el gateway varía por sitio
+# (f5_mgmt_gateway). Las entradas sin gateway definido se omiten.
+
+- name: "Configurar rutas de management"
+  f5networks.f5_modules.bigip_management_route:
+    name:        "{{ _route.name }}"
+    network:     "{{ _route.network }}"
+    gateway:     "{{ _route.gateway }}"
+    description: "{{ _route.description | default(omit) }}"
+    state:       present
+    provider:    "{{ f5_provider }}"
+  loop: "{{ f5_mgmt_routes }}"
+  loop_control:
+    loop_var: _route
+    label:    "{{ _route.name }}"
+  when: _route.gateway | default('') | length > 0

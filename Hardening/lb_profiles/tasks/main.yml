@@ -1,0 +1,10 @@
+#SPDX-License-Identifier: MIT-0
+---
+# tasks file for lb_profiles
+
+- name: "Cargar catalogo de checks para el perfil {{ profile_name }}"
+  ansible.builtin.include_vars: "{{ profile_name }}.yml"
+
+- name: "Ejecutar motor de hardening para el perfil {{ profile_name }}"
+  ansible.builtin.include_role:
+    name: lb_engine_core

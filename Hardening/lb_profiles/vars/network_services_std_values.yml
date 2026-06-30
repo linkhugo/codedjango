@@ -1,0 +1,345 @@
+---
+# Perfil: network_services_std_values
+# Agregar aquí los checks de servicios de red estándar.
+checks: 
+
+  - categoria: "NS_STD"
+    code: "NS_STD_001"
+    descripcion: "Habilitacion de Advisory Banner"
+    cmd: "list sys db ui.advisory.enabled"
+    api_path: "/mgmt/tm/sys/db/ui.advisory.enabled"
+    campo: "value"
+    valor_recomendado: "Se debe tener el valor true | modify sys db ui.advisory.enabled true"
+    policy:
+      - type: allow_any
+        values: ["true"]
+
+  - categoria: "NS_STD"
+    code: "NS_STD_002"
+    descripcion: "Colores de Advisory Banner"
+    cmd: "list sys db ui.advisory.color"
+    api_path: "/mgmt/tm/sys/db/ui.advisory.color"
+    campo: "value"
+    valor_recomendado: "Se debe colocar el color Verde para el Primary, Orange para el Secundary y Yellow para DRP | modify sys db ui.advisory.color green/orange/yellow"
+    policy:
+      - type: allow_any
+        values: ["green","orange","yellow"]
+
+  - categoria: "NS_STD"
+    code: "NS_STD_003"
+    descripcion: "Start Screen de la interfaz BIG-IP configurado en Performance"
+    cmd: "list sys db ui.system.preferences.startscreen"
+    api_path: "/mgmt/tm/sys/db/ui.system.preferences.startscreen"
+    campo: "value"
+    valor_recomendado: "Se debe configurar en performance | modify sys db ui.system.preferences.startscreen value performance"
+    policy:
+      - type: allow_any
+        values: ["performance"]
+
+  - categoria: "NS_STD"
+    code: "NS_STD_004"
+    descripcion: "Existencia del Device Group de HA"
+    cmd: "list cm device-group"
+    api_path: "/mgmt/tm/cm/device-group"
+    campo: "name"
+    valor_recomendado: "Se debe crear el device-group Device-Group-HA | create cm device-group Device-Group-HA"
+    policy:
+      - type: allow_any
+        values: ["device-group-ha"]
+
+  - categoria: "NS_STD"
+    code: "NS_STD_005"
+    descripcion: "Device Group de HA configurado con type sync-failover"
+    cmd: "list cm device-group Device-Group-HA type"
+    api_path: "/mgmt/tm/cm/device-group/~Common~Device-Group-HA"
+    campo: "type"
+    valor_recomendado: "Se debe configurar type sync-failover | modify cm device-group Device-Group-HA type sync-failover"
+    policy:
+      - type: allow_any
+        values: ["sync-failover"]
+
+  - categoria: "NS_STD"
+    code: "NS_STD_006"
+    descripcion: "Device Group de HA con network-failover habilitado"
+    cmd: "list cm device-group Device-Group-HA network-failover"
+    api_path: "/mgmt/tm/cm/device-group/~Common~Device-Group-HA"
+    campo: "networkFailover"
+    valor_recomendado: "Se debe habilitar network-failover | modify cm device-group Device-Group-HA network-failover enabled"
+    policy:
+      - type: allow_any
+        values: ["enabled"]
+
+  - categoria: "NS_STD"
+    code: "NS_STD_007"
+    descripcion: "Traffic Group 1 con MAC masquerade address configurada"
+    cmd: "list cm traffic-group traffic-group-1 mac"
+    api_path: "/mgmt/tm/cm/traffic-group/~Common~traffic-group-1"
+    campo: "mac"
+    valor_recomendado: "Se debe configurar una MAC masquerade address | modify cm traffic-group traffic-group-1 mac <MAC>"
+    policy:
+      - type: not_empty
+      - type: deny
+        values: ["none"]
+
+  - categoria: "NS_STD"
+    code: "NS_STD_008"
+    descripcion: "Traffic Group 1 con failover-method configurado en ha-order"
+    cmd: "list cm traffic-group traffic-group-1 failover-method"
+    api_path: "/mgmt/tm/cm/traffic-group/~Common~traffic-group-1"
+    campo: "failoverMethod"
+    valor_recomendado: "Se debe configurar failover-method ha-order | modify cm traffic-group traffic-group-1 failover-method ha-order"
+    policy:
+      - type: allow_any
+        values: ["ha-order"]
+
+  - categoria: "NS_STD"
+    code: "NS_STD_009"
+    descripcion: "Traffic Group 1 ha-order debe tener al menos 2 equipos"
+    cmd: "list cm traffic-group traffic-group-1 ha-order"
+    api_path: "/mgmt/tm/cm/traffic-group/~Common~traffic-group-1"
+    campo: "haOrder"
+    valor_recomendado: "Se deben configurar al menos 2 equipos en ha-order"
+    policy:
+      - type: min_list_count
+        value: 2
+
+  - categoria: "NS_STD"
+    code: "NS_STD_010"
+    descripcion: "DNS Lookup Server List debe tener al menos 2 servidores configurados"
+    cmd: "list sys dns name-servers"
+    api_path: "/mgmt/tm/sys/dns"
+    campo: "nameServers"
+    valor_recomendado: "Se deben configurar al menos 2 servidores DNS | modify sys dns { name-servers add { <IP1> <IP2> } }"
+    policy:
+      - type: min_list_count
+        value: 2
+
+  - categoria: "NS_STD"
+    code: "NS_STD_011"
+    descripcion: "Password max-duration debe ser 60 dias"
+    cmd: "list auth password-policy max-duration"
+    api_path: "/mgmt/tm/auth/password-policy"
+    campo: "maxDuration"
+    valor_recomendado: "Se debe configurar max-duration en 60 | modify auth password-policy max-duration 60"
+    policy:
+      - type: numeric_eq
+        value: 60
+
+  - categoria: "NS_STD"
+    code: "NS_STD_012"
+    descripcion: "Root login deshabilitado"
+    cmd: "list sys db systemauth.disablerootlogin"
+    api_path: "/mgmt/tm/sys/db/systemauth.disablerootlogin"
+    campo: "value"
+    valor_recomendado: "Se debe deshabilitar el root login | modify sys db systemauth.disablerootlogin value true"
+    policy:
+      - type: allow_any
+        values: ["true"]
+
+  - categoria: "NS_STD"
+    code: "NS_STD_013"
+    descripcion: "Self-allow default debe estar en none"
+    cmd: "list net self-allow defaults"
+    api_path: "/mgmt/tm/net/self-allow"
+    campo: "defaults"
+    valor_recomendado: "Se debe configurar self-allow default en none | modify net self-allow defaults none"
+    policy:
+      - type: allow_only
+        values: ["none"]
+
+  - categoria: "NS_STD"
+    code: "NS_STD_014"
+    descripcion: "Redirect HTTP a HTTPS habilitado"
+    cmd: "list sys httpd redirect-http-to-https"
+    api_path: "/mgmt/tm/sys/httpd"
+    campo: "redirectHttpToHttps"
+    valor_recomendado: "Se debe habilitar redirect HTTP a HTTPS | modify sys httpd redirect-http-to-https enabled"
+    policy:
+      - type: allow_any
+        values: ["enabled"]
+
+  - categoria: "NS_STD"
+    code: "NS_STD_015"
+    descripcion: "Maximum HTTP Connections to Configuration Utility debe ser 10"
+    cmd: "list sys httpd max-clients"
+    api_path: "/mgmt/tm/sys/httpd"
+    campo: "maxClients"
+    valor_recomendado: "Se debe configurar max-clients en 10 | modify sys httpd max-clients 10"
+    policy:
+      - type: numeric_eq
+        value: 10
+
+  - categoria: "NS_STD"
+    code: "NS_STD_016"
+    descripcion: "Remote Role Group Netdeck_NS debe existir"
+    cmd: "list auth remote-role role-info"
+    api_path: "/mgmt/tm/auth/remote-role/role-info"
+    campo: "name"
+    valor_recomendado: "Se debe crear el Remote Role Group Netdeck_NS"
+    policy:
+      - type: allow_any
+        values: ["netdeck_ns"]
+
+  - categoria: "NS_STD"
+    code: "NS_STD_017"
+    descripcion: "Remote Role Group Network_Services_CyberArk debe existir"
+    cmd: "list auth remote-role role-info"
+    api_path: "/mgmt/tm/auth/remote-role/role-info"
+    campo: "name"
+    valor_recomendado: "Se debe crear el Remote Role Group Network_Services_CyberArk"
+    policy:
+      - type: allow_any
+        values: ["network_services_cyberark"]
+
+  - categoria: "NS_STD"
+    code: "NS_STD_018"
+    descripcion: "Al menos una VLAN debe tener VLAN Failsafe habilitado"
+    cmd: "list net vlan { failsafe }"
+    api_path: "/mgmt/tm/net/vlan"
+    campo: "failsafe"
+    valor_recomendado: "Al menos una VLAN debe tener failsafe enabled | modify net vlan <nombre> failsafe enabled"
+    policy:
+      - type: allow_any
+        values: ["enabled"]
+
+  - categoria: "NS_STD"
+    code: "NS_STD_019"
+    descripcion: "Al menos una VLAN debe tener failsafe-action configurado como failover"
+    cmd: "list net vlan { failsafe-action }"
+    api_path: "/mgmt/tm/net/vlan"
+    campo: "failsafeAction"
+    valor_recomendado: "Al menos una VLAN debe tener failsafe-action failover | modify net vlan <nombre> failsafe-action failover"
+    policy:
+      - type: allow_any
+        values: ["failover"]
+
+  # ── Password Policy — extensiones CIS / DISA STIG ────────────────────────────
+
+  - categoria: "NS_STD"
+    code: "NS_STD_022"
+    descripcion: "Password expiration-warning debe ser al menos 7 dias"
+    cmd: "list auth password-policy expiration-warning"
+    api_path: "/mgmt/tm/auth/password-policy"
+    campo: "expirationWarning"
+    valor_recomendado: "Valor >= 7 | modify auth password-policy expiration-warning 7"
+    policy:
+      - type: numeric_gte
+        value: 7
+
+  # ── HTTPD — hardening de sesion ───────────────────────────────────────────────
+
+  - categoria: "NS_STD"
+    code: "NS_STD_024"
+    descripcion: "HTTPD auth-pam-dashboard-timeout debe estar habilitado"
+    cmd: "list sys httpd auth-pam-dashboard-timeout"
+    api_path: "/mgmt/tm/sys/httpd"
+    campo: "authPamDashboardTimeout"
+    valor_recomendado: "Valor on | modify sys httpd auth-pam-dashboard-timeout on"
+    policy:
+      - type: allow_any
+        values: ["on"]
+
+  - categoria: "NS_STD"
+    code: "NS_STD_025"
+    descripcion: "HTTPD auth-pam-validate-ip debe estar habilitado"
+    cmd: "list sys httpd auth-pam-validate-ip"
+    api_path: "/mgmt/tm/sys/httpd"
+    campo: "authPamValidateIp"
+    valor_recomendado: "Valor on | modify sys httpd auth-pam-validate-ip on"
+    policy:
+      - type: allow_any
+        values: ["on"]
+
+  # ── Routing — rutas ───────────────────────────────────────────────────────────
+
+  - categoria: "NS_STD"
+    code: "NS_STD_026"
+    descripcion: "Ruta de management Route_to_MGMT debe existir"
+    cmd: "list sys management-route"
+    api_path: "/mgmt/tm/sys/management-route"
+    campo: "name"
+    valor_recomendado: "Se debe crear la ruta de management | create sys management-route Route_to_MGMT { gateway <IP> network default }"
+    policy:
+      - type: allow_any
+        values: ["route_to_mgmt"]
+
+  - categoria: "NS_STD"
+    code: "NS_STD_027"
+    descripcion: "Ruta de red por default debe existir (net route default)"
+    cmd: "list net route"
+    api_path: "/mgmt/tm/net/route"
+    campo: "name"
+    valor_recomendado: "Se debe crear la ruta default | create net route default { gw <IP> network default }"
+    policy:
+      - type: allow_any
+        values: ["default"]
+
+  # ── HA — Config Sync ──────────────────────────────────────────────────────────
+
+  # ── Certificado de management ─────────────────────────────────────────────────
+
+  - categoria: "NS_STD"
+    code: "NS_STD_029"
+    descripcion: "Certificado de management CN o SAN debe coincidir con el hostname del inventario"
+    cmd: "list sys file ssl-cert server.crt { subject subject-alternative-name }"
+    api_path: "/mgmt/tm/sys/file/ssl-cert/~Common~server.crt"
+    campo: "subject"
+    valor_recomendado: "El CN del certificado debe coincidir con el hostname del dispositivo"
+    policy:
+      - type: must_contain_hostname
+
+  - categoria: "NS_STD"
+    code: "NS_STD_030"
+    descripcion: "Certificado de management no debe tener vigencia mayor a 360 dias"
+    cmd: "list sys file ssl-cert server.crt { expiration-date }"
+    api_path: "/mgmt/tm/sys/file/ssl-cert/~Common~server.crt"
+    campo: "expirationDate"
+    valor_recomendado: "El certificado debe expirar dentro de 360 dias | renovar con cert de vigencia <= 360 dias"
+    policy:
+      - type: cert_max_days_remaining
+        value: 360
+
+  # ── HA — Config Sync ──────────────────────────────────────────────────────────
+
+  - categoria: "NS_STD"
+    code: "NS_STD_031"
+    descripcion: "Hostname del equipo debe coincidir con el inventory_hostname"
+    cmd: "list sys global-settings hostname"
+    api_path: "/mgmt/tm/sys/global-settings"
+    campo: "hostname"
+    valor_recomendado: "El hostname del dispositivo debe coincidir con el nombre en el inventario de Ansible"
+    policy:
+      - type: must_contain_hostname
+
+  - categoria: "NS_STD"
+    code: "NS_STD_028"
+    descripcion: "Config Sync IP debe estar configurada en la Management Address"
+    cmd: "list cm device { configsync-ip management-ip }"
+    api_path: "/mgmt/tm/cm/device"
+    campo: "configsyncIp"
+    valor_recomendado: "configsync-ip debe coincidir con la management IP | modify cm device <hostname> configsync-ip <mgmt-IP>"
+    policy:
+      - type: not_empty
+      - type: deny
+        values: ["none", ""]
+      - type: deny_contains
+        pattern: "^error"
+
+  # ── SSHD — HostKeyAlgorithms ──────────────────────────────────────────────────
+
+  - categoria: "NS_STD"
+    code: "NS_STD_032"
+    descripcion: "HostKeyAlgorithms SSH debe excluir algoritmos deprecados e incluir RSA-SHA2 o Ed25519"
+    cmd: "list sys sshd include | grep -i HostKeyAlgorithms"
+    api_path: "/mgmt/tm/sys/sshd"
+    campo: "include"
+    display_keyword: "HostKeyAlgorithms"
+    valor_recomendado: "rsa-sha2-512,rsa-sha2-256,ssh-ed25519 "
+    policy:
+      - type: deny
+        values: ["ssh-dss", "ssh-rsa"]
+      - type: allow_any
+        values:
+          - "rsa-sha2-512"
+          - "rsa-sha2-256"
+          - "ssh-ed25519"

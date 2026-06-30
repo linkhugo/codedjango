@@ -1,0 +1,11 @@
+---
+# Variables del grupo f5_devices
+# ansible_password se define en f5_devices.vault.yml (encriptado)
+
+# Credenciales usadas por lb_profiles (lb_user / lb_pass)
+provider:
+  user: "{{ ansible_user }}"
+  password: "{{ ansible_password }}"
+
+# Directorio de salida para reportes CSV (override del default del rol)
+# hardening_output_dir: "/ruta/a/reportes"

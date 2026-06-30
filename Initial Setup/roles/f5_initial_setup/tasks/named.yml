@@ -1,0 +1,42 @@
+---
+# Check: 2.5.4
+# Detiene el servicio named vía el endpoint de bash de iControlREST.
+# No existe módulo nativo para gestión de servicios bigstart — usa uri con Basic Auth.
+#
+# f5_named_persistent_stop: false → solo detiene named (bigstart stop)
+# f5_named_persistent_stop: true  → detiene y deshabilita named (TMOS 14+)
+#                                   Solo usar si el dispositivo no necesita
+#                                   resolución DNS local.
+
+- name: "2.5.4 — Detener servicio named"
+  ansible.builtin.uri:
+    url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/util/bash"
+    method: POST
+    body_format: json
+    body:
+      command:     "run"
+      utilCmdArgs: "-c 'bigstart stop named'"
+    headers:
+      X-F5-Auth-Token: "{{ f5_api_token }}"
+    validate_certs:  "{{ f5_validate_certs }}"
+    status_code: 200
+    timeout: 30
+  delegate_to: localhost
+  no_log: true
+
+- name: "2.5.4 — Deshabilitar named de forma persistente (TMOS 14+)"
+  ansible.builtin.uri:
+    url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/util/bash"
+    method: POST
+    body_format: json
+    body:
+      command:     "run"
+      utilCmdArgs: "-c 'bigstart disable named 2>/dev/null; true'"
+    headers:
+      X-F5-Auth-Token: "{{ f5_api_token }}"
+    validate_certs:  "{{ f5_validate_certs }}"
+    status_code: 200
+    timeout: 30
+  delegate_to: localhost
+  no_log: true
+  when: f5_named_persistent_stop | bool

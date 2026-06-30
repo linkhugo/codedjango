@@ -1,0 +1,32 @@
+---
+# Checks: NS_STD_016, NS_STD_017
+# Crea remote role groups en BIG-IP para la integración con AD/LDAP.
+#
+# NS_STD_016 — Remote Role Group "netdeck_ns" existe
+# NS_STD_017 — Remote Role Group "network_services_cyberark" existe
+#
+# Sobreescribir f5_remote_role_groups en group_vars con los grupos del sitio.
+# Cada entrada requiere: name, line_order, attribute_string, assigned_role.
+#
+# Parámetros correctos del módulo bigip_remote_role:
+#   attribute_string  (no "attribute")
+#   remote_access     (bool, no "access_type")
+#   terminal_access   (no "console")
+#   partition_access  (no "partition")
+
+- name: "NS_STD_016/017 — Configurar remote role groups AD/LDAP"
+  f5networks.f5_modules.bigip_remote_role:
+    name:             "{{ _role.name }}"
+    line_order:       "{{ _role.line_order | default(1000) }}"
+    attribute_string: "{{ _role.attribute_string }}"
+    remote_access:    "{{ _role.remote_access | default(true) }}"
+    terminal_access:  "{{ _role.terminal_access | default('none') }}"
+    partition_access: "{{ _role.partition_access | default('all') }}"
+    assigned_role:    "{{ _role.assigned_role | default('operator') }}"
+    state:            present
+    provider:         "{{ f5_provider }}"
+  loop: "{{ f5_remote_role_groups }}"
+  loop_control:
+    loop_var: _role
+    label:    "{{ _role.name }}"
+  when: f5_remote_role_groups | length > 0

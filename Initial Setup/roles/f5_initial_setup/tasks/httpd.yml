@@ -1,0 +1,36 @@
+---
+# Checks: 2.3.1, 2.3.2, 2.3.3, 2.5.2, NS_STD_014, NS_STD_015, NS_STD_024, NS_STD_025
+#
+# bigip_sys_httpd no soporta el campo 'include' (directivas Apache arbitrarias),
+# por lo que FileETag (2.5.2) + la mitigación CVE-2020-5902 (K52145254) requieren
+# una tarea uri separada. El 'include' es un único string: se combinan ambos.
+
+- name: "2.3.x / NS_STD_014/015/024/025 — Configurar HTTPD"
+  f5networks.f5_modules.bigip_sys_httpd:
+    auth_pam_idle_timeout:        "{{ f5_httpd_idle_timeout }}"
+    allow:                        "{{ f5_httpd_allow }}"
+    ssl_protocols:                "{{ f5_httpd_ssl_protocol }}"
+    redirect_http_to_https:       "{{ f5_httpd_redirect_http_to_https }}"
+    max_clients:                  "{{ f5_httpd_max_clients }}"
+    auth_pam_dashboard_timeout:   "{{ f5_httpd_auth_pam_dashboard_timeout }}"
+    auth_pam_validate_ip:         "{{ f5_httpd_auth_pam_validate_ip }}"
+    provider:                     "{{ f5_provider }}"
+
+# Sin módulo nativo para el campo 'include' de sys/httpd.
+# Combina FileETag (2.5.2) con la mitigación LocationMatch de K52145254 en un
+# único include para que no se sobreescriban entre sí.
+- name: "2.5.2 + K52145254 — FileETag y mitigación CVE-2020-5902 en el include del httpd"
+  ansible.builtin.uri:
+    url: "https://{{ ansible_host }}:{{ f5_api_port }}/mgmt/tm/sys/httpd"
+    method: PATCH
+    body_format: json
+    body:
+      include: |-
+        FileETag {{ f5_httpd_fileetag }}
+        {{ f5_httpd_include_extra }}
+    headers:
+      X-F5-Auth-Token: "{{ f5_api_token }}"
+    validate_certs:  "{{ f5_validate_certs }}"
+    status_code: 200
+    timeout: 30
+  delegate_to: localhost

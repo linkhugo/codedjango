@@ -1,0 +1,55 @@
+---
+# Envía los resultados de auditoría a la API REST de Django.
+# Se invoca desde main.yml (hardening.yml) y combined_audit.yml.
+#
+# Variables requeridas:
+#   lb_api_url   → URL base de Django (ej. https://django-server.example.com)
+#   lb_api_user  → Usuario con permiso add_lbhardening (en vault)
+#   lb_api_pass  → Contraseña (en vault)
+#   resultados   → Lista de resultados del host actual
+
+- name: "Obtener token JWT de la API Django"
+  ansible.builtin.uri:
+    url: "{{ lb_api_url }}/api/v1/token/"
+    method: POST
+    body_format: json
+    body:
+      username: "{{ lb_api_user }}"
+      password: "{{ lb_api_pass }}"
+    validate_certs: false
+    status_code: 200
+    timeout: 30
+  register: _api_jwt_result
+  delegate_to: localhost
+  run_once: true
+  no_log: true
+
+- name: "Distribuir token JWT a todos los hosts"
+  ansible.builtin.set_fact:
+    _api_jwt_token: "{{ hostvars[ansible_play_hosts[0]]._api_jwt_result.json.access }}"
+
+- name: "Enviar check {{ _check.Code }} a la API"
+  ansible.builtin.uri:
+    url: "{{ lb_api_url }}/api/v1/hardening/checks/"
+    method: POST
+    body_format: json
+    body:
+      device:               "{{ _check.Device }}"
+      code:                 "{{ _check.Code }}"
+      descripcion:          "{{ _check.Descripcion }}"
+      valor_obtenido:       "{{ _check.Valor_Obtenido }}"
+      valor_recomendado:    "{{ _check.Valor_Recomendado }}"
+      resultado:            "{{ _check.Resultado }}"
+      comando_para_validar: "{{ _check.Comando_Para_Validar }}"
+      fecha:                "{{ _check.fecha }}"
+    headers:
+      Authorization: "Bearer {{ _api_jwt_token }}"
+    validate_certs: false
+    status_code: 201
+    timeout: 30
+  loop: "{{ resultados }}"
+  loop_control:
+    loop_var: _check
+    label: "{{ _check.Code }}"
+  delegate_to: localhost
+  ignore_errors: true

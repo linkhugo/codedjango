@@ -1,0 +1,17 @@
+---
+# Variables para snmp_v3_user.yml
+# La contraseña debe definirse en el vault del inventario:
+#   vault_snmp_v3_auth_password
+#   vault_snmp_v3_priv_password  (solo si security_level: auth-privacy)
+
+# ── Usuario SNMPv3 ────────────────────────────────────────────────────────────
+snmp_v3_name:             "monitoring"
+snmp_v3_security_level:   "auth-privacy"   # auth-no-privacy | auth-privacy | no-auth-no-privacy
+snmp_v3_auth_protocol:    "sha"            # sha | md5
+snmp_v3_auth_password:    "{{ vault_snmp_v3_auth_password }}"
+snmp_v3_priv_protocol:    "aes"            # aes | des
+snmp_v3_priv_password:    "{{ vault_snmp_v3_priv_password }}"
+snmp_v3_oid:              "/"
+
+# IPs a agregar a SNMP allowedAddresses (se suman a las existentes, no reemplazan)
+snmp_v3_allowed_addresses: []   # ejemplo: ["10.10.0.0/16", "192.168.1.5"]

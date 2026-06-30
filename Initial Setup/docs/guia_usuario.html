@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>F5 Initial Setup — Guía de Usuario</title>
+<style>
+  :root {
+    --f5-dark:   #1a2238;
+    --f5-blue:   #0066cc;
+    --f5-orange: #e85d26;
+    --f5-light:  #f5f7fa;
+    --border:    #d1d9e6;
+    --text:      #1e2d40;
+    --muted:     #5a6a7e;
+    --code-bg:   #1e2d40;
+    --code-fg:   #c9d1d9;
+    --green:     #1a7f37;
+    --green-bg:  #d4f4dd;
+    --red:       #cf222e;
+    --amber:     #9a6700;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; color: var(--text); background: var(--f5-light); font-size: 14px; line-height: 1.7; }
+  @media print { body { font-size: 12px; } }
+
+  header { background: var(--f5-dark); color: white; padding: 28px 40px; }
+  header .badge { background: var(--green); color: white; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 12px; text-transform: uppercase; }
+  header h1 { font-size: 22px; font-weight: 700; display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+  header p { font-size: 13px; color: #a0b4cc; }
+
+  nav { background: white; border-bottom: 2px solid var(--border); padding: 0 40px; position: sticky; top: 0; z-index: 100; }
+  nav ul { list-style: none; display: flex; overflow-x: auto; }
+  nav a { display: block; padding: 14px 18px; text-decoration: none; color: var(--muted); font-size: 13px; font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -2px; white-space: nowrap; }
+  nav a:hover { color: var(--f5-blue); border-bottom-color: var(--f5-blue); }
+
+  main { max-width: 900px; margin: 0 auto; padding: 36px 40px; }
+  section { margin-bottom: 52px; scroll-margin-top: 60px; }
+  h2 { font-size: 20px; font-weight: 700; color: var(--f5-dark); border-bottom: 2px solid var(--f5-orange); padding-bottom: 8px; margin-bottom: 20px; }
+  h3 { font-size: 15px; font-weight: 700; color: var(--f5-dark); margin: 24px 0 10px; }
+  h4 { font-size: 13px; font-weight: 600; color: var(--muted); margin: 14px 0 4px; text-transform: uppercase; letter-spacing: 0.4px; }
+  p { margin-bottom: 10px; }
+  ul, ol { padding-left: 22px; margin-bottom: 12px; }
+  li { margin-bottom: 5px; }
+
+  code { font-family: 'Consolas', monospace; background: #edf2f7; color: var(--f5-dark); padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+  pre { background: var(--code-bg); color: var(--code-fg); padding: 18px; border-radius: 8px; overflow-x: auto; font-size: 12.5px; line-height: 1.7; margin: 12px 0; font-family: 'Consolas', monospace; }
+  pre .comment { color: #6a8ba4; }
+  pre .key { color: #79b8ff; }
+  pre .str { color: #9ecbff; }
+  pre .cmd { color: #85e89d; }
+
+  /* Steps */
+  .steps { counter-reset: step; }
+  .step { display: flex; gap: 18px; margin-bottom: 28px; }
+  .step-num { counter-increment: step; flex-shrink: 0; width: 36px; height: 36px; background: var(--f5-orange); color: white; font-weight: 700; font-size: 15px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+  .step-body { flex: 1; padding-top: 6px; }
+  .step-title { font-weight: 700; font-size: 15px; color: var(--f5-dark); margin-bottom: 6px; }
+
+  /* Alerts */
+  .alert { border-left: 4px solid; padding: 12px 16px; border-radius: 0 6px 6px 0; margin: 12px 0; font-size: 13px; }
+  .alert-info { border-color: var(--f5-blue); background: #e8f0fc; }
+  .alert-warn { border-color: var(--amber); background: #fff8e6; }
+  .alert-ok   { border-color: var(--green); background: var(--green-bg); }
+  .alert-err  { border-color: var(--red); background: #ffeef0; }
+
+  /* Table */
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 18px; font-size: 13px; }
+  th { background: var(--f5-dark); color: white; padding: 9px 12px; text-align: left; font-size: 12px; }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:nth-child(even) td { background: #f0f4f9; }
+
+  /* Flag pills */
+  .pill { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+  .pill-skip { background: #e8edf5; color: var(--muted); }
+  .pill-req  { background: #ffe0d0; color: var(--red); }
+
+  /* Checklist */
+  .checklist { list-style: none; padding: 0; }
+  .checklist li { padding: 8px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; gap: 10px; }
+  .checklist li::before { content: "☐"; font-size: 16px; color: var(--muted); flex-shrink: 0; margin-top: -1px; }
+  .checklist li:last-child { border-bottom: none; }
+
+  footer { background: var(--f5-dark); color: #6a8ba4; text-align: center; padding: 20px; font-size: 12px; margin-top: 40px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>F5 BIG-IP Initial Setup <span class="badge">Guía de Usuario</span></h1>
+  <p>Paso a paso para configurar y ejecutar el playbook de hardening en un F5 BIG-IP</p>
+</header>
+
+<nav>
+  <ul>
+    <li><a href="#prereqs">Prerrequisitos</a></li>
+    <li><a href="#instalacion">Instalación</a></li>
+    <li><a href="#inventario">Inventario</a></li>
+    <li><a href="#variables">Variables</a></li>
+    <li><a href="#vault">Vault</a></li>
+    <li><a href="#ejecucion">Ejecución</a></li>
+    <li><a href="#skip">Skip Flags</a></li>
+    <li><a href="#verificacion">Verificación</a></li>
+    <li><a href="#troubleshoot">Problemas</a></li>
+  </ul>
+</nav>
+
+<main>
+
+<!-- PRERREQUISITOS -->
+<section id="prereqs">
+  <h2>Prerrequisitos</h2>
+  <table>
+    <tr><th>Componente</th><th>Versión mínima</th><th>Verificar con</th></tr>
+    <tr><td>Ansible</td><td>2.14</td><td><code>ansible --version</code></td></tr>
+    <tr><td>Python</td><td>3.8</td><td><code>python3 --version</code></td></tr>
+    <tr><td>f5networks.f5_modules</td><td>1.20.0</td><td><code>ansible-galaxy collection list f5networks.f5_modules</code></td></tr>
+    <tr><td>F5 BIG-IP TMOS</td><td>14.1+</td><td>Consola BIG-IP: <code>show sys version</code></td></tr>
+    <tr><td>Acceso HTTPS al BIG-IP</td><td>puerto 443</td><td><code>curl -k https://&lt;IP&gt;/mgmt/tm/sys/version</code></td></tr>
+  </table>
+
+  <div class="alert alert-info"><strong>Sin SSH al BIG-IP.</strong> El playbook corre completamente en el controller Ansible y se conecta al BIG-IP via HTTPS (iControlREST). No se requiere configurar SSH en el dispositivo.</div>
+
+  <h3>Usuario requerido en el BIG-IP</h3>
+  <p>El usuario configurado en <code>ansible_user</code> debe tener rol <strong>Administrator</strong> en el BIG-IP. Si el BIG-IP ya usa AD/LDAP como fuente de auth, se puede usar <code>f5_auth_provider</code> para especificar el origen.</p>
+</section>
+
+<!-- INSTALACIÓN -->
+<section id="instalacion">
+  <h2>Instalación</h2>
+  <div class="steps">
+
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Instalar la colección f5networks</div>
+        <pre><span class="cmd">ansible-galaxy collection install -r requirements.yml</span>
+
+<span class="comment"># O directamente:</span>
+<span class="cmd">ansible-galaxy collection install f5networks.f5_modules</span></pre>
+        <p>El archivo <code>requirements.yml</code> en la raíz del proyecto ya declara la versión mínima requerida.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Verificar la instalación</div>
+        <pre><span class="cmd">ansible-galaxy collection list f5networks.f5_modules</span></pre>
+        <p>Debe mostrar versión ≥ 1.20.0.</p>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- INVENTARIO -->
+<section id="inventario">
+  <h2>Configurar el Inventario</h2>
+  <p>El inventario define los dispositivos F5 y cómo agruparlos. Edita <code>inventory/hosts.ini</code>.</p>
+
+  <h3>Un solo dispositivo (caso simple)</h3>
+  <pre><span class="comment">[f5_devices]</span>
+<span class="key">f5-prod-01</span>   <span class="key">ansible_host</span>=<span class="str">192.168.1.100</span>
+
+<span class="comment">[f5_devices:vars]</span>
+<span class="key">ansible_connection</span>=<span class="str">local</span>
+<span class="key">ansible_user</span>=<span class="str">admin</span></pre>
+
+  <h3>Múltiples entidades (MEX / USA / PER)</h3>
+  <pre><span class="comment"># El inventario solo lista los hosts; la entidad NO va aquí.</span>
+<span class="comment">[f5_devices]</span>
+<span class="key">mex-lb01</span>   <span class="key">ansible_host</span>=<span class="str">10.1.1.10</span>
+<span class="key">usa-lb01</span>   <span class="key">ansible_host</span>=<span class="str">10.2.1.10</span>
+<span class="key">per-lb01</span>   <span class="key">ansible_host</span>=<span class="str">10.3.1.10</span>
+
+<span class="comment">[f5_devices:vars]</span>
+<span class="key">ansible_connection</span>=<span class="str">local</span>
+<span class="key">ansible_user</span>=<span class="str">admin</span></pre>
+
+  <p>La entidad se pasa al ejecutar con <code>-e entity=&lt;MEX|USA|PER&gt;</code>, que carga <code>entities/&lt;entity&gt;.yml</code>. Una corrida por entidad, acotando con <code>--limit</code>:</p>
+  <pre><span class="cmd">ansible-playbook setup.yml -e entity=MEX --limit mex-lb01 --ask-vault-pass</span>
+<span class="cmd">ansible-playbook setup.yml -e entity=USA --limit usa-lb01 --ask-vault-pass</span></pre>
+
+  <div class="alert alert-info">Las variables que cambian por entidad (AD, DNS, NTP, timezone, remote roles) viven en <code>entities/&lt;entity&gt;.yml</code>. Lo compartido por todas las entidades va en <code>inventory/group_vars/f5_devices.yml</code>. Si olvidas <code>-e entity=...</code>, el playbook falla con un mensaje claro.</div>
+</section>
+
+<!-- VARIABLES -->
+<section id="variables">
+  <h2>Configurar Variables del Sitio</h2>
+  <p>Las variables se reparten en dos lugares: lo <strong>compartido</strong> por todas las entidades en <code>inventory/group_vars/f5_devices.yml</code>, y lo que <strong>cambia por entidad</strong> en <code>entities/&lt;entity&gt;.yml</code>. Todas sobreescriben los defaults del rol.</p>
+
+  <h3>group_vars/f5_devices.yml — compartido por todas las entidades</h3>
+  <pre><span class="comment">---
+# Valores compartidos entre todos los F5</span>
+
+<span class="comment"># Fuente de autenticación</span>
+<span class="key">f5_auth_type</span>: <span class="str">"active-directory"</span>   <span class="comment"># o "ldap"</span>
+<span class="key">f5_auth_default_role</span>: <span class="str">"no-access"</span>
+
+<span class="comment"># Banner SSH</span>
+<span class="key">f5_sshd_banner_text</span>: <span class="str">"AUTHORIZED USE ONLY. Unauthorized access is prohibited."</span>
+
+<span class="comment"># IPs/redes permitidas para gestión (SNMP va por entidad, ver abajo)</span>
+<span class="key">f5_httpd_allow</span>:
+  - <span class="str">"10.0.0.0/8"</span>
+<span class="key">f5_sshd_allow</span>:
+  - <span class="str">"10.0.0.0/8"</span>
+
+<span class="comment"># Management route (NS_STD_026) — ruta fija; solo se define el gateway</span>
+<span class="key">f5_mgmt_gateway</span>: <span class="str">"10.10.1.1"</span>
+
+<span class="comment"># Color de advisory banner (NS_STD_002)</span>
+<span class="key">f5_advisory_color</span>: <span class="str">"green"</span>    <span class="comment"># default; por host en host_vars: blue/orange/yellow según rol</span></pre>
+
+  <h3>entities/MEX.yml — variables que cambian por entidad</h3>
+  <p>Se carga con <code>-e entity=MEX</code>. Existe un archivo equivalente por entidad (<code>MEX.yml</code>, <code>USA.yml</code>, <code>PER.yml</code>).</p>
+  <pre><span class="comment">---
+# Variables específicas de la entidad MEX</span>
+
+<span class="comment"># Servidores AD (2.2.2)</span>
+<span class="key">f5_auth_servers</span>:
+  - <span class="str">"dc1.mex.corp.com"</span>
+  - <span class="str">"dc2.mex.corp.com"</span>
+
+<span class="comment"># DNS (NS_STD_010)</span>
+<span class="key">f5_dns_servers</span>:
+  - <span class="str">"10.1.1.53"</span>
+  - <span class="str">"10.1.2.53"</span>
+<span class="key">f5_dns_search</span>:
+  - <span class="str">"mex.corp.com"</span>
+
+<span class="comment"># Subredes permitidas para SNMP (2.6.1)</span>
+<span class="key">f5_snmp_allowed_addresses</span>:
+  - <span class="str">"10.1.0.0/16"</span>
+
+<span class="comment"># Usuarios SNMPv3 (2.6.3) — MEX usa 3; passwords en el vault</span>
+<span class="key">f5_snmpv3_users</span>:
+  - <span class="key">name</span>: <span class="str">"nms_mex"</span>
+    <span class="key">auth_password</span>: <span class="str">"{{ lb_snmpv3_nms_mex_auth_password }}"</span>
+    <span class="key">priv_password</span>: <span class="str">"{{ lb_snmpv3_nms_mex_priv_password }}"</span>
+  - <span class="key">name</span>: <span class="str">"monitor_mex"</span>
+    <span class="key">auth_password</span>: <span class="str">"{{ lb_snmpv3_monitor_mex_auth_password }}"</span>
+    <span class="key">priv_password</span>: <span class="str">"{{ lb_snmpv3_monitor_mex_priv_password }}"</span>
+  - <span class="key">name</span>: <span class="str">"backup_mex"</span>
+    <span class="key">auth_password</span>: <span class="str">"{{ lb_snmpv3_backup_mex_auth_password }}"</span>
+    <span class="key">priv_password</span>: <span class="str">"{{ lb_snmpv3_backup_mex_priv_password }}"</span>
+
+<span class="comment"># NTP (2.5.1)</span>
+<span class="key">f5_ntp_servers</span>:
+  - <span class="str">"ntp1.mex.corp.com"</span>
+  - <span class="str">"ntp2.mex.corp.com"</span>
+<span class="key">f5_ntp_timezone</span>: <span class="str">"America/Mexico_City"</span>
+
+<span class="comment"># Remote role groups AD (NS_STD_016/017)</span>
+<span class="key">f5_remote_role_groups</span>:
+  - <span class="key">name</span>: <span class="str">"netdeck_ns"</span>
+    <span class="key">line_order</span>: <span class="str">100</span>
+    <span class="key">attribute_string</span>: <span class="str">"CN=netdeck_ns,OU=Groups,DC=mex,DC=corp,DC=com"</span>
+    <span class="key">assigned_role</span>: <span class="str">"manager"</span>
+    <span class="key">remote_access</span>: <span class="str">true</span>
+    <span class="key">terminal_access</span>: <span class="str">"tmsh"</span>
+    <span class="key">partition_access</span>: <span class="str">"all"</span></pre>
+
+  <div class="alert alert-info"><strong>Timezones por entidad:</strong> MEX → <code>America/Mexico_City</code>, USA → <code>America/New_York</code>, PER → <code>America/Lima</code>.</div>
+</section>
+
+<!-- VAULT -->
+<section id="vault">
+  <h2>Configurar Credenciales (Vault)</h2>
+  <p>Las contraseñas nunca deben estar en texto plano. Usa <strong>ansible-vault</strong> para encriptar el archivo de credenciales.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Crear el archivo vault</div>
+        <pre><span class="cmd">ansible-vault create inventory/group_vars/f5_devices.vault.yml</span></pre>
+        <p>Se abrirá un editor. Agrega las credenciales:</p>
+        <pre><span class="comment">---</span>
+<span class="key">ansible_password</span>: <span class="str">"TuContraseñaAdmin"</span>
+<span class="comment"># Un par auth/priv por cada usuario de f5_snmpv3_users (entities/&lt;entity&gt;.yml)</span>
+<span class="key">lb_snmpv3_nms_mex_auth_password</span>: <span class="str">"ContraseñaSNMPv3"</span>
+<span class="key">lb_snmpv3_nms_mex_priv_password</span>: <span class="str">"ContraseñaSNMPv3"</span>
+<span class="key">lb_snmpv3_monitor_mex_auth_password</span>: <span class="str">"ContraseñaSNMPv3"</span>
+<span class="key">lb_snmpv3_monitor_mex_priv_password</span>: <span class="str">"ContraseñaSNMPv3"</span></pre>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Verificar que el archivo está encriptado</div>
+        <pre><span class="cmd">cat inventory/group_vars/f5_devices.vault.yml</span>
+<span class="comment"># Debe mostrar $ANSIBLE_VAULT;1.1;AES256...</span></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="alert alert-warn">Agrega <code>*.vault.yml</code> al <code>.gitignore</code> si usas git. Nunca subas credenciales al repositorio.</div>
+</section>
+
+<!-- EJECUCIÓN -->
+<section id="ejecucion">
+  <h2>Ejecutar el Playbook</h2>
+
+  <div class="alert alert-warn">Siempre pasa la entidad con <code>-e entity=&lt;MEX|USA|PER&gt;</code>. Ejecuta una corrida por entidad y acota con <code>--limit</code> a los hosts de esa entidad.</div>
+
+  <h3>Dry-run (simulación sin cambios)</h3>
+  <pre><span class="cmd">ansible-playbook setup.yml \
+  --inventory inventory/hosts.ini \
+  -e entity=MEX \
+  --ask-vault-pass \
+  --check \
+  --diff</span></pre>
+
+  <h3>Ejecución real en un dispositivo específico</h3>
+  <pre><span class="cmd">ansible-playbook setup.yml \
+  --inventory inventory/hosts.ini \
+  -e entity=MEX \
+  --ask-vault-pass \
+  --limit mex-lb01</span></pre>
+
+  <h3>Con vault-password-file (sin prompt, para CI/CD)</h3>
+  <pre><span class="cmd">ansible-playbook setup.yml \
+  --inventory inventory/hosts.ini \
+  -e entity=USA \
+  --limit usa-lb01 \
+  --vault-password-file ~/.vault_pass.txt</span></pre>
+
+  <h3>Salida esperada (idempotencia)</h3>
+  <div class="alert alert-ok">Primera ejecución: las tareas reportarán <code>changed</code> al aplicar configuraciones.<br><br>Segunda ejecución: <strong>todas las tareas deben reportar <code>ok</code></strong> — el rol es completamente idempotente.</div>
+</section>
+
+<!-- SKIP FLAGS -->
+<section id="skip">
+  <h2>Skip Flags — Omitir Categorías</h2>
+  <p>Cada categoría tiene una variable <code>f5_skip_*</code>. Ponla en <code>true</code> para omitirla. Útil para aplicar solo ciertos checks o cuando un equipos ya tiene una categoría configurada.</p>
+
+  <table>
+    <tr><th>Variable</th><th>Omite</th></tr>
+    <tr><td><code>f5_skip_password_policy: true</code></td><td>Política de contraseñas (2.1.x + NS_STD_011/022)</td></tr>
+    <tr><td><code>f5_skip_auth_source: true</code></td><td>Fuente de autenticación AD/LDAP (2.2.x)</td></tr>
+    <tr><td><code>f5_skip_httpd: true</code></td><td>HTTPD / HTTPS (2.3.x + NS_STD_014/015/024/025)</td></tr>
+    <tr><td><code>f5_skip_sshd: true</code></td><td>SSH y timeouts de consola (2.4.x)</td></tr>
+    <tr><td><code>f5_skip_ntp: true</code></td><td>Servidores NTP (2.5.1)</td></tr>
+    <tr><td><code>f5_skip_self_ip: true</code></td><td>Self IPs allow-service + self-allow defaults (2.5.3 + NS_STD_013)</td></tr>
+    <tr><td><code>f5_skip_named: true</code></td><td>Servicio named (2.5.4)</td></tr>
+    <tr><td><code>f5_skip_snmp: true</code></td><td>SNMP v1/v2c/v3 (2.6.1-2.6.3)</td></tr>
+    <tr><td><code>f5_skip_logging: true</code></td><td>Log access y auditoría (2.6.4-2.6.14)</td></tr>
+    <tr><td><code>f5_skip_mgmt_route: true</code></td><td>Rutas de management (NS_STD_026)</td></tr>
+    <tr><td><code>f5_skip_system: true</code></td><td>Advisory banner, root login, hostname (NS_STD_001/002/003/012/031)</td></tr>
+    <tr><td><code>f5_skip_dns: true</code></td><td>DNS nameservers (NS_STD_010)</td></tr>
+    <tr><td><code>f5_skip_remote_roles: true</code></td><td>Remote role groups AD (NS_STD_016/017)</td></tr>
+  </table>
+
+  <h3>Ejemplo: aplicar solo SNMP y Logging</h3>
+  <pre><span class="comment"># En group_vars o directamente en la ejecución con -e:</span>
+<span class="cmd">ansible-playbook setup.yml \
+  --inventory inventory/hosts.ini \
+  -e entity=MEX \
+  --ask-vault-pass \
+  --limit mex-lb01 \
+  -e "f5_skip_password_policy=true \
+      f5_skip_auth_source=true \
+      f5_skip_httpd=true \
+      f5_skip_sshd=true \
+      f5_skip_ntp=true \
+      f5_skip_self_ip=true \
+      f5_skip_named=true \
+      f5_skip_system=true \
+      f5_skip_dns=true \
+      f5_skip_remote_roles=true \
+      f5_skip_mgmt_route=true"</span></pre>
+</section>
+
+<!-- VERIFICACIÓN -->
+<section id="verificacion">
+  <h2>Verificación Post-Ejecución</h2>
+  <p>Después de ejecutar el playbook, valida el resultado con el playbook de Hardening:</p>
+  <pre><span class="comment"># Desde el proyecto Hardening</span>
+<span class="cmd">ansible-playbook -i inventory/hosts.ini hardening_audit.yml \
+  --limit f5-cdmx-01</span></pre>
+  <p>El reporte CSV resultante debe mostrar <strong>passed</strong> en todos los checks configurados.</p>
+
+  <h3>Checklist de validación manual</h3>
+  <ul class="checklist">
+    <li>Password policy: BIG-IP UI → System → Users → Authentication → Password Policy</li>
+    <li>Auth source: BIG-IP UI → System → Users → Authentication</li>
+    <li>HTTPD idle timeout = 599 s: <code>list sys httpd auth-pam-idle-timeout</code></li>
+    <li>SSH banner habilitado: conectar por SSH y verificar mensaje</li>
+    <li>NTP sincronizado: <code>show sys ntp</code></li>
+    <li>SNMPv1/v2c deshabilitado: <code>list sys snmp snmpv1 snmpv2c</code></li>
+    <li>Hostname correcto: <code>list sys global-settings hostname</code></li>
+    <li>Advisory banner visible en UI del BIG-IP</li>
+    <li>Segunda ejecución del playbook → 0 tasks <code>changed</code></li>
+  </ul>
+</section>
+
+<!-- TROUBLESHOOT -->
+<section id="troubleshoot">
+  <h2>Problemas Comunes</h2>
+
+  <h3>Error: Connection refused / timeout</h3>
+  <div class="alert alert-err">El controller no puede alcanzar el BIG-IP en el puerto 443.</div>
+  <ul>
+    <li>Verificar que <code>ansible_host</code> es la IP de management del BIG-IP</li>
+    <li>Verificar que el puerto 443 está abierto: <code>curl -k https://&lt;IP&gt;/mgmt/tm/sys/version</code></li>
+    <li>Verificar que el usuario tiene acceso a la API: <code>-u admin:password</code></li>
+  </ul>
+
+  <h3>Error: 401 Unauthorized</h3>
+  <div class="alert alert-err">Credenciales incorrectas o usuario sin permisos.</div>
+  <ul>
+    <li>Verificar que <code>ansible_password</code> en vault es correcto</li>
+    <li>El usuario debe tener rol <strong>Administrator</strong> en el BIG-IP</li>
+    <li>Si el BIG-IP usa AD/LDAP, verificar <code>f5_auth_provider</code></li>
+  </ul>
+
+  <h3>Error: Task X changed pero se esperaba ok</h3>
+  <div class="alert alert-warn">La tarea no es idempotente o el valor en group_vars difiere del configurado en el BIG-IP.</div>
+  <ul>
+    <li>Revisar que los valores en <code>group_vars</code> coinciden con lo que ya tiene el dispositivo</li>
+    <li>Ejecutar con <code>--check --diff</code> para ver exactamente qué va a cambiar</li>
+  </ul>
+
+  <h3>DNS task se salta</h3>
+  <ul>
+    <li>Requiere <code>f5_dns_servers | length >= 2</code> — definir al menos 2 servidores DNS</li>
+  </ul>
+</section>
+
+</main>
+<footer>F5 BIG-IP Initial Setup · Guía de Usuario · Rol Ansible f5_initial_setup · Colección f5networks.f5_modules ≥1.20.0</footer>
+</body>
+</html>

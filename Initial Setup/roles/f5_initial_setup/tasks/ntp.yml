@@ -1,0 +1,10 @@
+---
+# Check: 2.5.1
+# Requiere al menos 2 servidores NTP (f5_ntp_servers en group_vars).
+
+- name: "2.5.1 — Configurar servidores NTP y timezone"
+  f5networks.f5_modules.bigip_device_ntp:
+    ntp_servers: "{{ f5_ntp_servers }}"
+    timezone:    "{{ f5_ntp_timezone }}"
+    provider:    "{{ f5_provider }}"
+  when: f5_ntp_servers | length >= 2
