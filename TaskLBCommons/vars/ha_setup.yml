@@ -20,14 +20,14 @@ ha_failover_port: 1026
 
 # ── Equipo primario (recibe MAC masquerade) ───────────────────────────────────
 ha_primary:
-  host:        "192.168.1.10"   # IP mgmt (ConfigSync se obtiene automáticamente)
-  failover_ip: "192.168.1.10"   # Heartbeat failover unicast (idealmente una Self-IP dedicada)
+  host:        "bigip-primary.corp.local"   # hostname o IP de mgmt (para API y provider)
+  failover_ip: "10.0.0.1"                   # IP de heartbeat unicast — siempre una IP
   # MAC masquerade se calcula automáticamente desde la MAC base del equipo (KB K3523)
 
 # ── Equipo secundario ─────────────────────────────────────────────────────────
 ha_secondary:
-  host:        "192.168.1.11"
-  failover_ip: "192.168.1.11"
+  host:        "bigip-secondary.corp.local"
+  failover_ip: "10.0.0.2"
 
 # ── VLANs con FailSafe ────────────────────────────────────────────────────────
 # failsafe_action: failover | reboot | restart-all
@@ -37,3 +37,13 @@ ha_vlans:
     failsafe:         "enabled"
     failsafe_action:  "failover"
     failsafe_timeout: 90
+
+# ── Vars planas para Jenkins (Invoke Ansible Playbook → Extra Variables) ──────
+# Si se definen, sobreescriben los valores de ha_primary/ha_secondary.
+# Dejar vacías ("") para usar los valores del dict de arriba.
+# ha_primary_host / ha_secondary_host     → hostname o IP de gestión
+# ha_primary_failover_ip / ha_secondary_failover_ip → IP de heartbeat (siempre una IP)
+ha_primary_host:          ""
+ha_primary_failover_ip:   ""
+ha_secondary_host:        ""
+ha_secondary_failover_ip: ""
